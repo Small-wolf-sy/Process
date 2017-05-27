@@ -21,6 +21,23 @@ namespace NXFunctions
         private static Part displayPart = theSession.Parts.Display;
         private static UI theUI = UI.GetUI();
 
+        public void SetDisPlay(Part workPart,string position)
+        {
+            PartLoadStatus partLoadStatus1;
+            theSession.Parts.SetDisplay(workPart, true, true, out partLoadStatus1);
+            ModelingView modelview = workPart.ModelingViews.WorkView;
+            string strModelView = modelview.Name;
+            string viewName = position;
+            Layout layout1 = (Layout)workPart.Layouts.FindObject("L1");
+            if (strModelView != viewName)
+            {
+                ModelingView modelingView1 = (ModelingView)workPart.ModelingViews.FindObject(viewName);
+                layout1.ReplaceView(workPart.ModelingViews.WorkView, modelingView1, true);
+            }
+        }
+
+
+        #region 实现轴向标注规划
         public void Paralleldimension(Part workPart)
         {
             Body body = workPart.Bodies.ToArray()[0];
@@ -140,6 +157,7 @@ namespace NXFunctions
                 }
             }
         }
+        #endregion 
 
         #region 作布尔差得到去除的制造体,输出一个特征
         public void createCollector(Body targetbody, Body toolbody, out Feature succuessfeature)
@@ -335,17 +353,7 @@ namespace NXFunctions
             Mark_Face = axis_dimension_face;//把我们要用通过继承来标注的面输出出去
             #endregion
 
-            PartLoadStatus partLoadStatus1;
-            theSession.Parts.SetDisplay(workPart, true, true, out partLoadStatus1);
-            Layout layout1 = (Layout)workPart.Layouts.FindObject("L1");
-            ModelingView modelview = workPart.ModelingViews.WorkView;
-            string strModelView = modelview.Name;
-            string viewName = "RIGHT";
-            if (strModelView != viewName)
-            {
-                ModelingView modelingView1 = (ModelingView)workPart.ModelingViews.FindObject(viewName);
-                layout1.ReplaceView(workPart.ModelingViews.WorkView, modelingView1, true);
-            }
+            SetDisPlay(workPart,"RIGHT");       
 
             #region 在这里就可以对径向进行标注,但发现因为在检查退刀槽时也进行了对比，导致径向尺寸会标注两次
             double y = 10;
@@ -387,12 +395,7 @@ namespace NXFunctions
             #endregion
 
             //完成后，对视图的标注改成后视图，为轴向标注做准备
-            viewName = "BACK";
-            if (strModelView != viewName)
-            {
-                ModelingView modelingView1 = (ModelingView)workPart.ModelingViews.FindObject(viewName);
-                layout1.ReplaceView(workPart.ModelingViews.WorkView, modelingView1, true);
-            }
+            SetDisPlay(workPart,"BACK");
         }
         #endregion 
 
