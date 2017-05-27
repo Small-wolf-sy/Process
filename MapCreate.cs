@@ -1787,17 +1787,7 @@ namespace MapWindows
                     start_part = (Part)theSession.Parts.FindObject(name);
                     theUFSession.Assem.SetWorkPart(start_part.Tag);
                     Part workPart = theSession.Parts.Work;
-                    PartLoadStatus partLoadStatus1;
-                    theSession.Parts.SetDisplay(workPart, true, true, out partLoadStatus1);
-                    ModelingView modelview = workPart.ModelingViews.WorkView;
-                    string strModelView = modelview.Name;
-                    string viewName = "BACK";
-                    Layout layout1 = (Layout)workPart.Layouts.FindObject("L1");
-                    if (strModelView != viewName)
-                    {
-                        ModelingView modelingView1 = (ModelingView)workPart.ModelingViews.FindObject(viewName);
-                        layout1.ReplaceView(workPart.ModelingViews.WorkView, modelingView1, true);
-                    }
+                    NXFun.SetDisPlay(workPart,"BACK");
                     NXFun.Paralleldimension(workPart);
                 }
                 PartLoadStatus partLoadStatus2;
