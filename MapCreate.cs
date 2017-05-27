@@ -1713,7 +1713,72 @@ namespace MapWindows
                 }
             }
             //美观化布局
-            #region 第一种方法
+            //#region 第一种方法
+            //foreach (string name in get_name)
+            //{
+            //    if ((name.Contains("right") == true) || (name.Contains("left") == true))
+            //    {
+            //        Part start_part = null;
+            //        start_part = (Part)theSession.Parts.FindObject(name);
+            //        theUFSession.Assem.SetWorkPart(start_part.Tag);
+            //        Part workPart = theSession.Parts.Work;
+            //        PartLoadStatus partLoadStatus1;
+            //        theSession.Parts.SetDisplay(workPart, true, true, out partLoadStatus1);
+            //        Layout layout1 = (Layout)workPart.Layouts.FindObject("L1");
+            //        ModelingView modelview = workPart.ModelingViews.WorkView;
+            //        string strModelView = modelview.Name;
+            //        string viewName = "RIGHT";
+            //        if (strModelView != viewName)
+            //        {
+            //            ModelingView modelingView1 = (ModelingView)workPart.ModelingViews.FindObject(viewName);
+            //            layout1.ReplaceView(workPart.ModelingViews.WorkView, modelingView1, true);
+            //        }
+            //        Body body = workPart.Bodies.ToArray()[0];
+            //        Dimension[] alldimension = workPart.Dimensions.ToArray();
+            //        double temp = 0;
+            //        int z = 10;
+            //        foreach (Dimension each in alldimension)
+            //        {
+            //            if (each.GetType().ToString() == "NXOpen.Annotations.PmiCylindricalDimension")
+            //            {
+            //                if (each.ComputedSize > temp)
+            //                {
+            //                    temp = each.ComputedSize;
+            //                }
+            //            }
+            //        }
+
+            //        body = workPart.Bodies.ToArray()[0];
+            //        alldimension = workPart.Dimensions.ToArray();
+            //        strModelView = modelview.Name;
+            //        viewName = "BACK";
+            //        if (strModelView != viewName)
+            //        {
+            //            ModelingView modelingView1 = (ModelingView)workPart.ModelingViews.FindObject(viewName);
+            //            layout1.ReplaceView(workPart.ModelingViews.WorkView, modelingView1, true);
+            //        }
+            //        foreach (Dimension each in alldimension)
+            //        {
+            //            if (each.GetType().ToString() == "NXOpen.Annotations.PmiParallelDimension")
+            //            {
+            //                Point3d check_point1;
+            //                check_point1 = each.AnnotationOrigin;
+            //                check_point1.Z = temp + z;
+            //                each.AnnotationOrigin = check_point1;
+            //                each.IsOriginCentered = true;
+            //                z = z + 10;
+            //            }
+            //        }
+            //    }
+            //    PartLoadStatus partLoadStatus2;
+            //    NXOpen.PartCollection.SdpsStatus status1;
+            //    Part part1 = (Part)theSession.Parts.FindObject(mother);
+            //    status1 = theSession.Parts.SetDisplay(part1, true, true, out partLoadStatus2);
+            //    partLoadStatus2.Dispose();
+            //}
+            //#endregion
+
+            #region 第二种方法,更好
             foreach (string name in get_name)
             {
                 if ((name.Contains("right") == true) || (name.Contains("left") == true))
@@ -1724,77 +1789,22 @@ namespace MapWindows
                     Part workPart = theSession.Parts.Work;
                     PartLoadStatus partLoadStatus1;
                     theSession.Parts.SetDisplay(workPart, true, true, out partLoadStatus1);
-                    Layout layout1 = (Layout)workPart.Layouts.FindObject("L1");
                     ModelingView modelview = workPart.ModelingViews.WorkView;
                     string strModelView = modelview.Name;
-                    string viewName = "RIGHT";
+                    string viewName = "BACK";
+                    Layout layout1 = (Layout)workPart.Layouts.FindObject("L1");
                     if (strModelView != viewName)
                     {
                         ModelingView modelingView1 = (ModelingView)workPart.ModelingViews.FindObject(viewName);
                         layout1.ReplaceView(workPart.ModelingViews.WorkView, modelingView1, true);
                     }
-                    Body body = workPart.Bodies.ToArray()[0];
-                    Dimension[] alldimension = workPart.Dimensions.ToArray();
-                    double temp = 0;
-                    int z = 10;
-                    foreach (Dimension each in alldimension)
-                    {
-                        if (each.GetType().ToString() == "NXOpen.Annotations.PmiCylindricalDimension")
-                        {
-                            if (each.ComputedSize > temp)
-                            {
-                                temp = each.ComputedSize;
-                            }
-                        }
-                    }
-
-                    body = workPart.Bodies.ToArray()[0];
-                    alldimension = workPart.Dimensions.ToArray();
-                    strModelView = modelview.Name;
-                    viewName = "BACK";
-                    if (strModelView != viewName)
-                    {
-                        ModelingView modelingView1 = (ModelingView)workPart.ModelingViews.FindObject(viewName);
-                        layout1.ReplaceView(workPart.ModelingViews.WorkView, modelingView1, true);
-                    }
-                    foreach (Dimension each in alldimension)
-                    {
-                        if (each.GetType().ToString() == "NXOpen.Annotations.PmiParallelDimension")
-                        {
-                            Point3d check_point1;
-                            check_point1 = each.AnnotationOrigin;
-                            check_point1.Z = temp + z;
-                            each.AnnotationOrigin = check_point1;
-                            each.IsOriginCentered = true;
-                            z = z + 10;
-                        }
-                    }
+                    NXFun.Paralleldimension(workPart);
                 }
                 PartLoadStatus partLoadStatus2;
                 NXOpen.PartCollection.SdpsStatus status1;
                 Part part1 = (Part)theSession.Parts.FindObject(mother);
                 status1 = theSession.Parts.SetDisplay(part1, true, true, out partLoadStatus2);
                 partLoadStatus2.Dispose();
-            }
-            #endregion
-
-            #region 第二种方法
-            foreach (string name in get_name)
-            {
-                Part start_part = null;
-                start_part = (Part)theSession.Parts.FindObject(name);
-                theUFSession.Assem.SetWorkPart(start_part.Tag);
-                Part workPart = theSession.Parts.Work;
-                ModelingView modelview = workPart.ModelingViews.WorkView;
-                string strModelView = modelview.Name;
-                string viewName = "BACK";
-                Layout layout1 = (Layout)workPart.Layouts.FindObject("L1");
-                if (strModelView != viewName)
-                {
-                    ModelingView modelingView1 = (ModelingView)workPart.ModelingViews.FindObject(viewName);
-                    layout1.ReplaceView(workPart.ModelingViews.WorkView, modelingView1, true);
-                }
-                NXFun.Paralleldimension(workPart);
             }
             #endregion 
         }

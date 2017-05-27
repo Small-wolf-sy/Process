@@ -46,7 +46,16 @@ namespace NXFunctions
             Dimension[] all_dimension = workPart.Dimensions.ToArray();
             double z = 10;
             Dimension check = null;
+            List<Dimension> help_dimension = new List<Dimension>();
             //按大小排序
+            foreach (Dimension check_dimension in all_dimension)
+            {
+                if (check_dimension.GetType().ToString() == "NXOpen.Annotations.PmiParallelDimension")
+                {
+                    help_dimension.Add(check_dimension);
+                }
+            }
+            all_dimension = help_dimension.ToArray();
             for (int i = 0; i < all_dimension.Length; i++)
             {
                 check = all_dimension[i];
@@ -125,7 +134,7 @@ namespace NXFunctions
                     NXObject[] result = delete.ToArray();
                     DeleteObject(result);
                     Point3d result_point = pmidimension.AnnotationOrigin;
-                    result_point.Y = temp + z;//可能要与具体轴的方位有关
+                    result_point.Z = temp + z;//可能要与具体轴的方位有关，在装配实例中，要改成Z，到时试试看能不能知道Xform的性质吧，比如根据Xform的方向做一个选择分支
                     pmidimension.AnnotationOrigin = result_point;
                     z = z + 10;
                 }
