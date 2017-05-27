@@ -1892,6 +1892,101 @@ namespace MapWindows
 
         private void button5_Click(object sender, EventArgs e)//解决了圆柱的问题，圆柱统一改为这种标注方法，同时要对其进行筛选
         {
+            #region 获取部件中各个part的名字
+            int num_part;
+            List<string> part_name = new List<string>();
+            List<Tag> part_tag = new List<Tag>();
+            //获得部件的个数
+            num_part = theUFSession.Part.AskNumParts();
+            //得到part的tag集
+            for (int help_num_part = 0; help_num_part < num_part; help_num_part++)
+            {
+                part_tag.Add(theUFSession.Part.AskNthPart(help_num_part));
+            }
+            //得到part的name集
+            foreach (Tag help_part in part_tag)
+            {
+                string help_name;
+                theUFSession.Part.AskPartName(help_part, out help_name);
+                Part help_part2 =(Part)theSession.Parts.FindObject(help_name);
+                help_name = help_part2.JournalIdentifier;
+                part_name.Add(help_name);//不再是路径了,直接是表中显示的名字，同时，findobject同样可以应用于这个非路径的名字
+            }
+            #endregion
+            //获得整体
+            string mother = null;
+            foreach (string name in part_name)
+            {
+                if (name.Contains("Process") == true)
+                {
+                    mother = name;
+                    break;
+                }
+            }
+
+            string[] get_name=part_name.ToArray();
+            foreach (string name in get_name)
+            {
+                if ((name.Contains("right") == true)||(name.Contains("left")==true))
+                {
+                    Part start_part = null;
+                    start_part = (Part)theSession.Parts.FindObject(name);
+                    theUFSession.Assem.SetWorkPart(start_part.Tag);
+                    Part workPart = theSession.Parts.Work;
+                    PartLoadStatus partLoadStatus1;
+                    theSession.Parts.SetDisplay(workPart, true, true, out partLoadStatus1);
+                    Layout layout1 = (Layout)workPart.Layouts.FindObject("L1");
+                    ModelingView modelview = workPart.ModelingViews.WorkView;
+                    string strModelView = modelview.Name;
+                    string viewName = "RIGHT";
+                    if (strModelView != viewName)
+                    {
+                        ModelingView modelingView1 = (ModelingView)workPart.ModelingViews.FindObject(viewName);
+                        layout1.ReplaceView(workPart.ModelingViews.WorkView, modelingView1, true);
+                    }
+                    Body body = workPart.Bodies.ToArray()[0];
+                    Dimension[] alldimension = workPart.Dimensions.ToArray();
+                    double temp = 0;
+                    int z = 10;
+                    foreach (Dimension each in alldimension)
+                    {
+                        if (each.GetType().ToString() == "NXOpen.Annotations.PmiCylindricalDimension")
+                        {
+                            if (each.ComputedSize > temp)
+                            {
+                                temp = each.ComputedSize;
+                            }
+                        }
+                    }
+
+                    body = workPart.Bodies.ToArray()[0];
+                    alldimension = workPart.Dimensions.ToArray();
+                    strModelView = modelview.Name;
+                    viewName = "BACK";
+                    if (strModelView != viewName)
+                    {
+                        ModelingView modelingView1 = (ModelingView)workPart.ModelingViews.FindObject(viewName);
+                        layout1.ReplaceView(workPart.ModelingViews.WorkView, modelingView1, true);
+                    }
+                    foreach (Dimension each in alldimension)
+                    {
+                        if (each.GetType().ToString() == "NXOpen.Annotations.PmiParallelDimension")
+                        {
+                            Point3d check_point1;
+                            check_point1 = each.AnnotationOrigin;
+                            check_point1.Z = temp + z;
+                            each.AnnotationOrigin = check_point1;
+                            each.IsOriginCentered = true;
+                            z = z + 10;
+                        }
+                    }
+                }
+                PartLoadStatus partLoadStatus2;
+                NXOpen.PartCollection.SdpsStatus status1;
+                Part part1 = (Part)theSession.Parts.FindObject(mother);
+                status1 = theSession.Parts.SetDisplay(part1, true, true, out partLoadStatus2);
+                partLoadStatus2.Dispose();
+            }
         }
     }
 }
