@@ -21,6 +21,117 @@ namespace NXFunctions
         private static Part displayPart = theSession.Parts.Display;
         private static UI theUI = UI.GetUI();
 
+        public void Paralleldimension(Part workPart)
+        {
+            Body body = workPart.Bodies.ToArray()[0];
+            Face[] all_face = body.GetFaces();
+            List<double> points = new List<double>();
+            List<Face> faces = new List<Face>();
+            foreach (Face check_face in all_face)
+            {
+                if (check_face.SolidFaceType.ToString() == "Cylindrical")
+                {
+                    int type;
+                    double[] point = new double[6];
+                    double[] dir = new double[5];
+                    double[] box = new double[6];
+                    double radius;
+                    double rad_data;
+                    int norm_dir;
+                    theUFSession.Modl.AskFaceData(check_face.Tag, out type, point, dir, box, out radius, out rad_data, out norm_dir);
+                    points.Add(point[0]);
+                    faces.Add(check_face);
+                }
+            }
+            Dimension[] all_dimension = workPart.Dimensions.ToArray();
+            double z = 10;
+            Dimension check = null;
+            //按大小排序
+            for (int i = 0; i < all_dimension.Length; i++)
+            {
+                check = all_dimension[i];
+                for (int j = i + 1; j < all_dimension.Length; j++)
+                {
+                    if (check.ComputedSize >= all_dimension[j].ComputedSize)
+                    {
+                        check = all_dimension[j];
+                        all_dimension[j] = all_dimension[i];//排序需要将大的往后放
+                        all_dimension[i] = check;
+                    }
+                }
+            }
+            foreach (Dimension pmidimension in all_dimension)
+            {
+                if (pmidimension.GetType().ToString() == "NXOpen.Annotations.PmiParallelDimension")
+                {
+                    Associativity ass1 = pmidimension.GetAssociativity(1);
+                    Associativity ass2 = pmidimension.GetAssociativity(2);
+                    Edge edge1 = (Edge)ass1.FirstObject;
+                    Edge edge2 = (Edge)ass2.FirstObject;
+                    Face[] face1 = edge1.GetFaces();
+                    Face[] face2 = edge2.GetFaces();
+                    double loc1 = 0;
+                    double loc2 = 0;
+                    //找到当前尺寸的两个平面的端面位置
+                    foreach (Face check_face1 in face1)
+                    {
+                        if (check_face1.SolidFaceType.ToString() == "Planar")
+                        {
+                            int type;
+                            double[] point = new double[6];
+                            double[] dir = new double[5];
+                            double[] box = new double[6];
+                            double radius;
+                            double rad_data;
+                            int norm_dir;
+                            theUFSession.Modl.AskFaceData(check_face1.Tag, out type, point, dir, box, out radius, out rad_data, out norm_dir);
+                            loc1 = point[0];
+                            break;
+                        }
+                    }
+                    foreach (Face check_face2 in face2)
+                    {
+                        if (check_face2.SolidFaceType.ToString() == "Planar")
+                        {
+                            int type;
+                            double[] point = new double[6];
+                            double[] dir = new double[5];
+                            double[] box = new double[6];
+                            double radius;
+                            double rad_data;
+                            int norm_dir;
+                            theUFSession.Modl.AskFaceData(check_face2.Tag, out type, point, dir, box, out radius, out rad_data, out norm_dir);
+                            loc2 = point[0];
+                            break;
+                        }
+                    }
+                    double temp = 0;
+                    List<NXObject> delete = new List<NXObject>();
+                    foreach (double point in points)
+                    {
+                        if (((point < loc1) & (point > loc2)) || ((point > loc1) & (point < loc2)))
+                        {
+                            Face face = faces[points.IndexOf(point)];
+                            Dimension check_points = null;
+                            Point3d helppoint = new Point3d(0, 0, 0);
+                            Cylindricaldimension(face, helppoint, out check_points);
+                            if (temp < check_points.ComputedSize)
+                            {
+                                temp = check_points.ComputedSize;
+                            }
+                            delete.Add(check_points);
+                        }
+                    }
+                    NXObject[] result = delete.ToArray();
+                    DeleteObject(result);
+                    Point3d result_point = pmidimension.AnnotationOrigin;
+                    result_point.Y = temp + z;//可能要与具体轴的方位有关
+                    pmidimension.AnnotationOrigin = result_point;
+                    z = z + 10;
+                }
+            }
+        }
+
         #region 作布尔差得到去除的制造体,输出一个特征
         public void createCollector(Body targetbody, Body toolbody, out Feature succuessfeature)
         {

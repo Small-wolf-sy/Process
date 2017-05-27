@@ -50,7 +50,7 @@ namespace MapWindows
             {
                 string help_name;
                 theUFSession.Part.AskPartName(help_part, out help_name);
-                Part help_part2 =(Part)theSession.Parts.FindObject(help_name);
+                Part help_part2 = (Part)theSession.Parts.FindObject(help_name);
                 help_name = help_part2.JournalIdentifier;
                 part_name.Add(help_name);//不再是路径了,直接是表中显示的名字，同时，findobject同样可以应用于这个非路径的名字
             }
@@ -66,8 +66,8 @@ namespace MapWindows
                 }
             }
 
-            string[] get_name=part_name.ToArray();
-            for (int i = 0; i < (get_name.Length-1);i++)
+            string[] get_name = part_name.ToArray();
+            for (int i = 0; i < (get_name.Length - 1); i++)
             {
                 if ((get_name[i].Contains("part") == true) || (get_name[i].Contains("blank") == true) || (get_name[i].Contains("Process") == true))
                 {
@@ -75,19 +75,19 @@ namespace MapWindows
                 else
                 {
                     Part start_part = null;
-                    Part link_part = null; 
+                    Part link_part = null;
                     Part map_part = null;
                     List<Face> Markface = new List<Face>();
                     List<double> Markfacepoint = new List<double>();
                     List<Face> Mapface = new List<Face>();
                     List<double> Mapfacepoint = new List<double>();
                     string start_name = get_name[i];//暂时没发现哪儿有问题
-                    string link_name = get_name[i+1];
+                    string link_name = get_name[i + 1];
                     start_part = (Part)theSession.Parts.FindObject(start_name);
                     link_part = (Part)theSession.Parts.FindObject(link_name);
                     List<Face> Mark_sort_face1 = new List<Face>();
 
-                    NXFun.GetMarkFace(start_part,link_part, out Mark_sort_face1);
+                    NXFun.GetMarkFace(start_part, link_part, out Mark_sort_face1);
                     //恢复装配序列
                     PartLoadStatus partLoadStatus2;
                     NXOpen.PartCollection.SdpsStatus status1;
@@ -258,7 +258,7 @@ namespace MapWindows
                                                 Edge[] mark_edge2 = MarkfaceTest[num2].GetEdges();
                                                 Dimension markdim;
                                                 bool check;
-                                                NXFun.CheckOverDimension(MarkfaceTest[num1], MarkfaceTest[num2],Over_check_Face,out check);
+                                                NXFun.CheckOverDimension(MarkfaceTest[num1], MarkfaceTest[num2], Over_check_Face, out check);
                                                 if (check == false)
                                                 {
                                                     NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
@@ -1712,6 +1712,8 @@ namespace MapWindows
                     #endregion
                 }
             }
+            //美观化布局
+            #region 第一种方法
             foreach (string name in get_name)
             {
                 if ((name.Contains("right") == true) || (name.Contains("left") == true))
@@ -1774,6 +1776,27 @@ namespace MapWindows
                 status1 = theSession.Parts.SetDisplay(part1, true, true, out partLoadStatus2);
                 partLoadStatus2.Dispose();
             }
+            #endregion
+
+            #region 第二种方法
+            foreach (string name in get_name)
+            {
+                Part start_part = null;
+                start_part = (Part)theSession.Parts.FindObject(name);
+                theUFSession.Assem.SetWorkPart(start_part.Tag);
+                Part workPart = theSession.Parts.Work;
+                ModelingView modelview = workPart.ModelingViews.WorkView;
+                string strModelView = modelview.Name;
+                string viewName = "BACK";
+                Layout layout1 = (Layout)workPart.Layouts.FindObject("L1");
+                if (strModelView != viewName)
+                {
+                    ModelingView modelingView1 = (ModelingView)workPart.ModelingViews.FindObject(viewName);
+                    layout1.ReplaceView(workPart.ModelingViews.WorkView, modelingView1, true);
+                }
+                NXFun.Paralleldimension(workPart);
+            }
+            #endregion 
         }
 
         private void button2_Click(object sender, EventArgs e)//获取属性邻接图
@@ -1782,11 +1805,11 @@ namespace MapWindows
             Part workpart = theSession.Parts.Work;
             Body[] bodies = workpart.Bodies.ToArray();
             Face[] faces = bodies[0].GetFaces();
-            int num=faces.Length;
+            int num = faces.Length;
             List<int[]> neigh_Face = new List<int[]>();
             for (int i = 0; i < num; i++)
             {
-                int[] a=new int[num];
+                int[] a = new int[num];
                 neigh_Face.Add(a);
                 int type1;
                 double[] point1 = new double[6];
@@ -1795,9 +1818,9 @@ namespace MapWindows
                 double radius1;
                 double rad_data1;
                 int norm_dir1;
-                theUFSession.Modl.AskFaceData(faces[i].Tag,out type1,point1,dir1,box1,out radius1,out rad_data1,out norm_dir1);
-                Vector3d vector1 = new Vector3d(dir1[0],dir1[1],dir1[2]);
-                for (int j =i; j < num; j++)
+                theUFSession.Modl.AskFaceData(faces[i].Tag, out type1, point1, dir1, box1, out radius1, out rad_data1, out norm_dir1);
+                Vector3d vector1 = new Vector3d(dir1[0], dir1[1], dir1[2]);
+                for (int j = i; j < num; j++)
                 {
                     if (j == i)
                     {
@@ -1822,14 +1845,14 @@ namespace MapWindows
                             int norm_dir2;
                             theUFSession.Modl.AskFaceData(faces[j].Tag, out type2, point2, dir2, box2, out radius2, out rad_data2, out norm_dir2);
                             Vector3d vector2 = new Vector3d(dir2[0], dir2[1], dir2[2]);
-                            Vector3d result = new Vector3d(vector1.Y*vector2.Z-vector1.Z*vector2.Y,vector1.Z*vector2.X-vector1.X*vector2.Z,vector1.X*vector2.Y-vector1.Y*vector2.X);
-                            double two = result.Y / (Math.Sqrt(Math.Pow(result.X,2)+Math.Pow(result.Y,2)+Math.Pow(result.Z,2)));
+                            Vector3d result = new Vector3d(vector1.Y * vector2.Z - vector1.Z * vector2.Y, vector1.Z * vector2.X - vector1.X * vector2.Z, vector1.X * vector2.Y - vector1.Y * vector2.X);
+                            double two = result.Y / (Math.Sqrt(Math.Pow(result.X, 2) + Math.Pow(result.Y, 2) + Math.Pow(result.Z, 2)));
                             //用arccos不太靠谱
-                            if (two>=0)
+                            if (two >= 0)
                             {//指向Y轴正方向
                                 neigh_Face[i][j] = -1;
                             }
-                            else if (two<0)
+                            else if (two < 0)
                             {//Y轴负方向
                                 neigh_Face[i][j] = 1;
                             }
@@ -1876,116 +1899,128 @@ namespace MapWindows
                 NXFun.InputXml(name, neigh_Face, all);
             }
             catch
-            {  
+            {
             }
             if (open == false)
             {
                 XmlDeclaration decl = all.CreateXmlDeclaration("1.0", "utf-8", null);
                 all.AppendChild(decl);
-                XmlElement mother =all.CreateElement("零件名及其零件属性图");
+                XmlElement mother = all.CreateElement("零件名及其零件属性图");
                 all.AppendChild(mother);
                 NXFun.InputXml(name, neigh_Face, all);
             }
             #endregion
         }
 
-
-        private void button5_Click(object sender, EventArgs e)//解决了圆柱的问题，圆柱统一改为这种标注方法，同时要对其进行筛选
+        private void button5_Click(object sender, EventArgs e)//对轴向布局进行轴件长度
         {
-            #region 获取部件中各个part的名字
-            int num_part;
-            List<string> part_name = new List<string>();
-            List<Tag> part_tag = new List<Tag>();
-            //获得部件的个数
-            num_part = theUFSession.Part.AskNumParts();
-            //得到part的tag集
-            for (int help_num_part = 0; help_num_part < num_part; help_num_part++)
+            Part workpart = theSession.Parts.Work;
+            Body body = workpart.Bodies.ToArray()[0];
+            Face[] all_face = body.GetFaces();
+            List<double> points = new List<double>();
+            List<Face> faces = new List<Face>();
+            foreach (Face check_face in all_face)
             {
-                part_tag.Add(theUFSession.Part.AskNthPart(help_num_part));
-            }
-            //得到part的name集
-            foreach (Tag help_part in part_tag)
-            {
-                string help_name;
-                theUFSession.Part.AskPartName(help_part, out help_name);
-                Part help_part2 =(Part)theSession.Parts.FindObject(help_name);
-                help_name = help_part2.JournalIdentifier;
-                part_name.Add(help_name);//不再是路径了,直接是表中显示的名字，同时，findobject同样可以应用于这个非路径的名字
-            }
-            #endregion
-            //获得整体
-            string mother = null;
-            foreach (string name in part_name)
-            {
-                if (name.Contains("Process") == true)
+                if (check_face.SolidFaceType.ToString() == "Cylindrical")
                 {
-                    mother = name;
-                    break;
+                    int type;
+                    double[] point = new double[6];
+                    double[] dir = new double[5];
+                    double[] box = new double[6];
+                    double radius;
+                    double rad_data;
+                    int norm_dir;
+                    theUFSession.Modl.AskFaceData(check_face.Tag, out type, point, dir, box, out radius, out rad_data, out norm_dir);
+                    points.Add(point[0]);
+                    faces.Add(check_face);
                 }
             }
-
-            string[] get_name=part_name.ToArray();
-            foreach (string name in get_name)
+            Dimension[] all_dimension = workpart.Dimensions.ToArray();
+            double z = 10;
+            Dimension check = null;
+            //按大小排序
+            for (int i = 0; i < all_dimension.Length; i++)
             {
-                if ((name.Contains("right") == true)||(name.Contains("left")==true))
+                check = all_dimension[i];
+                for (int j = i + 1; j < all_dimension.Length; j++)
                 {
-                    Part start_part = null;
-                    start_part = (Part)theSession.Parts.FindObject(name);
-                    theUFSession.Assem.SetWorkPart(start_part.Tag);
-                    Part workPart = theSession.Parts.Work;
-                    PartLoadStatus partLoadStatus1;
-                    theSession.Parts.SetDisplay(workPart, true, true, out partLoadStatus1);
-                    Layout layout1 = (Layout)workPart.Layouts.FindObject("L1");
-                    ModelingView modelview = workPart.ModelingViews.WorkView;
-                    string strModelView = modelview.Name;
-                    string viewName = "RIGHT";
-                    if (strModelView != viewName)
+                    if (check.ComputedSize >= all_dimension[j].ComputedSize)
                     {
-                        ModelingView modelingView1 = (ModelingView)workPart.ModelingViews.FindObject(viewName);
-                        layout1.ReplaceView(workPart.ModelingViews.WorkView, modelingView1, true);
+                        check = all_dimension[j];
+                        all_dimension[j] = all_dimension[i];//排序需要将大的往后放
+                        all_dimension[i] = check;
                     }
-                    Body body = workPart.Bodies.ToArray()[0];
-                    Dimension[] alldimension = workPart.Dimensions.ToArray();
+                }
+            }
+            foreach (Dimension pmidimension in all_dimension)
+            {
+                if (pmidimension.GetType().ToString() == "NXOpen.Annotations.PmiParallelDimension")
+                {
+                    Associativity ass1 = pmidimension.GetAssociativity(1);
+                    Associativity ass2 = pmidimension.GetAssociativity(2);
+                    Edge edge1 = (Edge)ass1.FirstObject;
+                    Edge edge2 = (Edge)ass2.FirstObject;
+                    Face[] face1 = edge1.GetFaces();
+                    Face[] face2 = edge2.GetFaces();
+                    double loc1 = 0;
+                    double loc2 = 0;
+                    //找到当前尺寸的两个平面的端面位置
+                    foreach (Face check_face1 in face1)
+                    {
+                        if (check_face1.SolidFaceType.ToString() == "Planar")
+                        {
+                            int type;
+                            double[] point = new double[6];
+                            double[] dir = new double[5];
+                            double[] box = new double[6];
+                            double radius;
+                            double rad_data;
+                            int norm_dir;
+                            theUFSession.Modl.AskFaceData(check_face1.Tag, out type, point, dir, box, out radius, out rad_data, out norm_dir);
+                            loc1 = point[0];
+                            break;
+                        }
+                    }
+                    foreach (Face check_face2 in face2)
+                    {
+                        if (check_face2.SolidFaceType.ToString() == "Planar")
+                        {
+                            int type;
+                            double[] point = new double[6];
+                            double[] dir = new double[5];
+                            double[] box = new double[6];
+                            double radius;
+                            double rad_data;
+                            int norm_dir;
+                            theUFSession.Modl.AskFaceData(check_face2.Tag, out type, point, dir, box, out radius, out rad_data, out norm_dir);
+                            loc2 = point[0];
+                            break;
+                        }
+                    }
                     double temp = 0;
-                    int z = 10;
-                    foreach (Dimension each in alldimension)
+                    List<NXObject> delete = new List<NXObject>();
+                    foreach (double point in points)
                     {
-                        if (each.GetType().ToString() == "NXOpen.Annotations.PmiCylindricalDimension")
+                        if (((point < loc1) & (point > loc2)) || ((point > loc1) & (point < loc2)))
                         {
-                            if (each.ComputedSize > temp)
+                            Face face = faces[points.IndexOf(point)];
+                            Dimension check_points = null;
+                            Point3d helppoint = new Point3d(0, 0, 0);
+                            NXFun.Cylindricaldimension(face, helppoint, out check_points);
+                            if (temp < check_points.ComputedSize)
                             {
-                                temp = each.ComputedSize;
+                                temp = check_points.ComputedSize;
                             }
+                            delete.Add(check_points);
                         }
                     }
-
-                    body = workPart.Bodies.ToArray()[0];
-                    alldimension = workPart.Dimensions.ToArray();
-                    strModelView = modelview.Name;
-                    viewName = "BACK";
-                    if (strModelView != viewName)
-                    {
-                        ModelingView modelingView1 = (ModelingView)workPart.ModelingViews.FindObject(viewName);
-                        layout1.ReplaceView(workPart.ModelingViews.WorkView, modelingView1, true);
-                    }
-                    foreach (Dimension each in alldimension)
-                    {
-                        if (each.GetType().ToString() == "NXOpen.Annotations.PmiParallelDimension")
-                        {
-                            Point3d check_point1;
-                            check_point1 = each.AnnotationOrigin;
-                            check_point1.Z = temp + z;
-                            each.AnnotationOrigin = check_point1;
-                            each.IsOriginCentered = true;
-                            z = z + 10;
-                        }
-                    }
+                    NXObject[] result = delete.ToArray();
+                    NXFun.DeleteObject(result);
+                    Point3d result_point = pmidimension.AnnotationOrigin;
+                    result_point.Y = temp + z;//可能要与具体轴的方位有关
+                    pmidimension.AnnotationOrigin = result_point;
+                    z = z + 10;
                 }
-                PartLoadStatus partLoadStatus2;
-                NXOpen.PartCollection.SdpsStatus status1;
-                Part part1 = (Part)theSession.Parts.FindObject(mother);
-                status1 = theSession.Parts.SetDisplay(part1, true, true, out partLoadStatus2);
-                partLoadStatus2.Dispose();
             }
         }
     }
