@@ -187,158 +187,182 @@ namespace MapWindows
                             theUFSession.Assem.SetWorkPart(start_part.Tag);
                             workPartMark = theSession.Parts.Work;
                             Point3d position = new Point3d(-50, 70, 0);
+
+                            List<Dimension> help_dimension = new List<Dimension>();
+                            //按大小排序
+                            foreach (Dimension check_dimension in map_dimension)
+                            {
+                                if (check_dimension.GetType().ToString() == "NXOpen.Annotations.PmiParallelDimension")
+                                {
+                                    help_dimension.Add(check_dimension);
+                                }
+                            }
+                            Dimension trans_dimension = null;
+                            map_dimension = help_dimension.ToArray();
+                            for (int p = 0; p < map_dimension.Length; p++)
+                            {
+                                trans_dimension = map_dimension[p];
+                                for (int j = p + 1; j < map_dimension.Length; j++)
+                                {
+                                    if (trans_dimension.ComputedSize >= map_dimension[j].ComputedSize)
+                                    {
+                                        trans_dimension = map_dimension[j];
+                                        map_dimension[j] = map_dimension[p];//排序需要将大的往后放
+                                        map_dimension[p] = trans_dimension;
+                                    }
+                                }
+                            }
                             foreach (Dimension check_dim in map_dimension)
                             {
-                                if (check_dim.GetType().ToString() == "NXOpen.Annotations.PmiParallelDimension")
+                                Associativity ass1 = check_dim.GetAssociativity(1);
+                                Associativity ass2 = check_dim.GetAssociativity(2);
+                                Edge edge1 = (Edge)ass1.FirstObject;
+                                Edge edge2 = (Edge)ass2.FirstObject;
+                                //我们要找面
+                                Face[] face1 = edge1.GetFaces();
+                                Face[] face2 = edge2.GetFaces();
+                                int loc1 = 100;
+                                int loc2 = 100;
+                                #region 找标注有关的2个面在列表处的索引位置
+                                foreach (Face check_face1 in face1)
                                 {
-                                    Associativity ass1 = check_dim.GetAssociativity(1);
-                                    Associativity ass2 = check_dim.GetAssociativity(2);
-                                    Edge edge1 = (Edge)ass1.FirstObject;
-                                    Edge edge2 = (Edge)ass2.FirstObject;
-                                    //我们要找面
-                                    Face[] face1 = edge1.GetFaces();
-                                    Face[] face2 = edge2.GetFaces();
-                                    int loc1 = 100;
-                                    int loc2 = 100;
-                                    #region 找标注有关的2个面在列表处的索引位置
-                                    foreach (Face check_face1 in face1)
+                                    if (check_face1.SolidFaceType.ToString() == "Planar")
                                     {
-                                        if (check_face1.SolidFaceType.ToString() == "Planar")
+                                        int check_index = 0;
+                                        foreach (Face compare_face1 in Mapface)
                                         {
-                                            int check_index = 0;
-                                            foreach (Face compare_face1 in Mapface)
+                                            if (check_face1 == compare_face1)
                                             {
-                                                if (check_face1 == compare_face1)
-                                                {
-                                                    loc1 = check_index;
-                                                    break;
-                                                }
-                                                check_index = check_index + 1;
+                                                loc1 = check_index;
+                                                break;
                                             }
+                                            check_index = check_index + 1;
                                         }
                                     }
-                                    foreach (Face check_face2 in face2)
+                                }
+                                foreach (Face check_face2 in face2)
+                                {
+                                    if (check_face2.SolidFaceType.ToString() == "Planar")
                                     {
-                                        if (check_face2.SolidFaceType.ToString() == "Planar")
+                                        int check_index = 0;
+                                        foreach (Face compare_face2 in Mapface)
                                         {
-                                            int check_index = 0;
-                                            foreach (Face compare_face2 in Mapface)
+                                            if (check_face2 == compare_face2)
                                             {
-                                                if (check_face2 == compare_face2)
-                                                {
-                                                    loc2 = check_index;
-                                                    break;
-                                                }
-                                                check_index = check_index + 1;
+                                                loc2 = check_index;
+                                                break;
+                                            }
+                                            check_index = check_index + 1;
+                                        }
+                                    }
+                                }
+                                #endregion
+                                if ((loc1 == 100) || (loc2 == 100))
+                                {
+                                    //即当前尺寸涉及的某个面在映射面中不存在
+                                }
+                                else
+                                {
+                                    #region 当前标注的两个面当前工序和映射工序都存在
+                                    //如果粗加工时，得到的两个面在映射标注的工序模型里都有
+                                    if ((MarkfaceTestpoint.Contains(Mapfacepoint[loc1]) == true) & (MarkfaceTestpoint.Contains(Mapfacepoint[loc2]) == true))
+                                    {
+                                        int num1;
+                                        num1 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc1], 0);
+                                        int num2;
+                                        num2 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc2], 0);
+                                        if ((Markfacepoint.Contains(MarkfaceTestpoint[num1]) == false) & (Markfacepoint.Contains(MarkfaceTestpoint[num2]) == false))
+                                        {
+                                            //当前标注的两个面，全部都不是制造特征体所得到的
+                                        }
+                                        else
+                                        {
+                                            Edge[] mark_edge1 = MarkfaceTest[num1].GetEdges();
+                                            Edge[] mark_edge2 = MarkfaceTest[num2].GetEdges();
+                                            Dimension markdim;
+                                            bool check;
+                                            NXFun.CheckOverDimension(MarkfaceTest[num1], MarkfaceTest[num2], Over_check_Face, out check);
+                                            if (check == false)
+                                            {
+                                                NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
+                                                Over_check_Face.Add(MarkfaceTest[num1]);
+                                                Over_check_Face.Add(MarkfaceTest[num2]);
                                             }
                                         }
                                     }
                                     #endregion
-                                    if ((loc1 == 100) || (loc2 == 100))
+
+                                    #region 当前标注有一个面是映射工序里存在着的
+                                    //如果有一个面是当前工序得到的，而映射尺寸的工序模型里也有
+                                    else if (MarkfaceTestpoint.Contains(Mapfacepoint[loc1]) == true)//只包含一个
                                     {
-                                        //即当前尺寸涉及的某个面在映射面中不存在
-                                    }
-                                    else
-                                    {
-                                        #region 当前标注的两个面当前工序和映射工序都存在
-                                        //如果粗加工时，得到的两个面在映射标注的工序模型里都有
-                                        if ((MarkfaceTestpoint.Contains(Mapfacepoint[loc1]) == true) & (MarkfaceTestpoint.Contains(Mapfacepoint[loc2]) == true))
+                                        double[] counts = MarkfaceTestpoint.ToArray();
+                                        int count = counts.Length;
+                                        int num1;
+                                        num1 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc1], 0);
+                                        int num2;
+                                        num2 = loc2;
+                                        if ((num2 < count) & (num1 != num2))
                                         {
-                                            int num1;
-                                            num1 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc1], 0);
-                                            int num2;
-                                            num2 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc2], 0);
-                                            if ((Markfacepoint.Contains(MarkfaceTestpoint[num1]) == false) & (Markfacepoint.Contains(MarkfaceTestpoint[num2]) == false))
+                                            bool check;
+                                            Edge[] mark_edge1 = MarkfaceTest[num1].GetEdges();
+                                            Edge[] mark_edge2 = MarkfaceTest[num2].GetEdges();
+                                            NXFun.CheckOverDimension(MarkfaceTest[num1], MarkfaceTest[num2], Over_check_Face, out check);
+                                            if (check == false)
                                             {
-                                                //当前标注的两个面，全部都不是制造特征体所得到的
-                                            }
-                                            else
-                                            {
-                                                Edge[] mark_edge1 = MarkfaceTest[num1].GetEdges();
-                                                Edge[] mark_edge2 = MarkfaceTest[num2].GetEdges();
                                                 Dimension markdim;
-                                                bool check;
-                                                NXFun.CheckOverDimension(MarkfaceTest[num1], MarkfaceTest[num2], Over_check_Face, out check);
-                                                if (check == false)
-                                                {
-                                                    NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
-                                                    Over_check_Face.Add(MarkfaceTest[num1]);
-                                                    Over_check_Face.Add(MarkfaceTest[num2]);
-                                                }
+                                                NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
+                                                Over_check_Face.Add(MarkfaceTest[num1]);
+                                                Over_check_Face.Add(MarkfaceTest[num2]);
                                             }
                                         }
-                                        #endregion
-                                        #region 当前标注有一个面是映射工序里存在着的
-                                        //如果有一个面是当前工序得到的，而映射尺寸的工序模型里也有
-                                        else if (MarkfaceTestpoint.Contains(Mapfacepoint[loc1]) == true)//只包含一个
-                                        {
-                                            double[] counts = MarkfaceTestpoint.ToArray();
-                                            int count = counts.Length;
-                                            int num1;
-                                            num1 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc1], 0);
-                                            int num2;
-                                            num2 = loc2;
-                                            if ((num2 < count) & (num1 != num2))
-                                            {
-                                                bool check;
-                                                Edge[] mark_edge1 = MarkfaceTest[num1].GetEdges();
-                                                Edge[] mark_edge2 = MarkfaceTest[num2].GetEdges();
-                                                NXFun.CheckOverDimension(MarkfaceTest[num1], MarkfaceTest[num2], Over_check_Face, out check);
-                                                if (check == false)
-                                                {
-                                                    Dimension markdim;
-                                                    NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
-                                                    Over_check_Face.Add(MarkfaceTest[num1]);
-                                                    Over_check_Face.Add(MarkfaceTest[num2]);
-                                                }
-                                            }
-                                        }
-                                        else if (MarkfaceTestpoint.Contains(Mapfacepoint[loc2]) == true)
-                                        {
-                                            double[] counts = MarkfaceTestpoint.ToArray();
-                                            int count = counts.Length;
-                                            int num2;
-                                            num2 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc2], 0);
-                                            int num1;
-                                            num1 = loc1;
-                                            if ((num1 < count) & (num1 != num2))
-                                            {
-                                                bool check;
-                                                Edge[] mark_edge1 = MarkfaceTest[num1].GetEdges();
-                                                Edge[] mark_edge2 = MarkfaceTest[num2].GetEdges();
-                                                NXFun.CheckOverDimension(MarkfaceTest[num1], MarkfaceTest[num2], Over_check_Face, out check);
-                                                if (check == false)
-                                                {
-                                                    Dimension markdim;
-                                                    NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
-                                                    Over_check_Face.Add(MarkfaceTest[num1]);
-                                                    Over_check_Face.Add(MarkfaceTest[num2]);
-                                                }
-                                            }
-                                        }
-                                        #endregion
-                                        #region 两个面均不是当前工序和映射工序的公共面,那么就按照顺序来
-                                        else if ((MarkfaceTestpoint.Contains(Mapfacepoint[loc1]) == false) & (MarkfaceTestpoint.Contains(Mapfacepoint[loc2]) == false))
-                                        {
-                                            double[] counts = Markfacepoint.ToArray();
-                                            int count = counts.Length;
-                                            if ((loc1 < count) & (loc2 < count) & (loc1 != loc2))
-                                            {
-                                                bool check;
-                                                Edge[] mark_edge1 = Markface[loc1].GetEdges();
-                                                Edge[] mark_edge2 = Markface[loc2].GetEdges();
-                                                NXFun.CheckOverDimension(MarkfaceTest[loc1], MarkfaceTest[loc2], Over_check_Face, out check);
-                                                if (check == false)
-                                                {
-                                                    Dimension markdim;
-                                                    NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
-                                                    Over_check_Face.Add(MarkfaceTest[loc1]);
-                                                    Over_check_Face.Add(MarkfaceTest[loc2]);
-                                                }
-                                            }
-                                        }
-                                        #endregion
                                     }
+                                    else if (MarkfaceTestpoint.Contains(Mapfacepoint[loc2]) == true)
+                                    {
+                                        double[] counts = MarkfaceTestpoint.ToArray();
+                                        int count = counts.Length;
+                                        int num2;
+                                        num2 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc2], 0);
+                                        int num1;
+                                        num1 = loc1;
+                                        if ((num1 < count) & (num1 != num2))
+                                        {
+                                            bool check;
+                                            Edge[] mark_edge1 = MarkfaceTest[num1].GetEdges();
+                                            Edge[] mark_edge2 = MarkfaceTest[num2].GetEdges();
+                                            NXFun.CheckOverDimension(MarkfaceTest[num1], MarkfaceTest[num2], Over_check_Face, out check);
+                                            if (check == false)
+                                            {
+                                                Dimension markdim;
+                                                NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
+                                                Over_check_Face.Add(MarkfaceTest[num1]);
+                                                Over_check_Face.Add(MarkfaceTest[num2]);
+                                            }
+                                        }
+                                    }
+                                    #endregion
+
+                                    #region 两个面均不是当前工序和映射工序的公共面,那么就按照顺序来
+                                    else if ((MarkfaceTestpoint.Contains(Mapfacepoint[loc1]) == false) & (MarkfaceTestpoint.Contains(Mapfacepoint[loc2]) == false))
+                                    {
+                                        double[] counts = Markfacepoint.ToArray();
+                                        int count = counts.Length;
+                                        if ((loc1 < count) & (loc2 < count) & (loc1 != loc2))
+                                        {
+                                            bool check;
+                                            Edge[] mark_edge1 = Markface[loc1].GetEdges();
+                                            Edge[] mark_edge2 = Markface[loc2].GetEdges();
+                                            NXFun.CheckOverDimension(MarkfaceTest[loc1], MarkfaceTest[loc2], Over_check_Face, out check);
+                                            if (check == false)
+                                            {
+                                                Dimension markdim;
+                                                NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
+                                                Over_check_Face.Add(MarkfaceTest[loc1]);
+                                                Over_check_Face.Add(MarkfaceTest[loc2]);
+                                            }
+                                        }
+                                    }
+                                    #endregion
                                 }
                             }
                             #endregion
@@ -361,158 +385,181 @@ namespace MapWindows
                             int mark_face_num = mark_face_in_target.Length;
                             theUFSession.Assem.SetWorkPart(start_part.Tag);
                             workPartMark = theSession.Parts.Work;
+
+                            List<Dimension> help_dimension = new List<Dimension>();
+                            //按大小排序
+                            foreach (Dimension check_dimension in map_dimension)
+                            {
+                                if (check_dimension.GetType().ToString() == "NXOpen.Annotations.PmiParallelDimension")
+                                {
+                                    help_dimension.Add(check_dimension);
+                                }
+                            }
+                            Dimension trans_dimension = null;
+                            map_dimension = help_dimension.ToArray();
+                            for (int p = 0; p < map_dimension.Length; p++)
+                            {
+                                trans_dimension = map_dimension[p];
+                                for (int j = p + 1; j < map_dimension.Length; j++)
+                                {
+                                    if (trans_dimension.ComputedSize >= map_dimension[j].ComputedSize)
+                                    {
+                                        trans_dimension = map_dimension[j];
+                                        map_dimension[j] = map_dimension[p];//排序需要将大的往后放
+                                        map_dimension[p] = trans_dimension;
+                                    }
+                                }
+                            }
+
                             foreach (Dimension check_dim in map_dimension)
                             {
-                                if (check_dim.GetType().ToString() == "NXOpen.Annotations.PmiParallelDimension")
+                                Associativity ass1 = check_dim.GetAssociativity(1);
+                                Associativity ass2 = check_dim.GetAssociativity(2);
+                                Edge edge1 = (Edge)ass1.FirstObject;
+                                Edge edge2 = (Edge)ass2.FirstObject;
+                                //我们要找面
+                                Face[] face1 = edge1.GetFaces();
+                                Face[] face2 = edge2.GetFaces();
+                                int loc1 = 100;
+                                int loc2 = 100;
+                                #region 找标注有关的2个面在列表处的索引位置
+                                foreach (Face check_face1 in face1)
                                 {
-                                    Associativity ass1 = check_dim.GetAssociativity(1);
-                                    Associativity ass2 = check_dim.GetAssociativity(2);
-                                    Edge edge1 = (Edge)ass1.FirstObject;
-                                    Edge edge2 = (Edge)ass2.FirstObject;
-                                    //我们要找面
-                                    Face[] face1 = edge1.GetFaces();
-                                    Face[] face2 = edge2.GetFaces();
-                                    int loc1 = 100;
-                                    int loc2 = 100;
-                                    #region 找标注有关的2个面在列表处的索引位置
-                                    foreach (Face check_face1 in face1)
+                                    if (check_face1.SolidFaceType.ToString() == "Planar")
                                     {
-                                        if (check_face1.SolidFaceType.ToString() == "Planar")
+                                        int check_index = 0;
+                                        foreach (Face compare_face1 in Mapface)
                                         {
-                                            int check_index = 0;
-                                            foreach (Face compare_face1 in Mapface)
+                                            if (check_face1 == compare_face1)
                                             {
-                                                if (check_face1 == compare_face1)
-                                                {
-                                                    loc1 = check_index;
-                                                    break;
-                                                }
-                                                check_index = check_index + 1;
+                                                loc1 = check_index;
+                                                break;
                                             }
+                                            check_index = check_index + 1;
                                         }
                                     }
-                                    foreach (Face check_face2 in face2)
+                                }
+                                foreach (Face check_face2 in face2)
+                                {
+                                    if (check_face2.SolidFaceType.ToString() == "Planar")
                                     {
-                                        if (check_face2.SolidFaceType.ToString() == "Planar")
+                                        int check_index = 0;
+                                        foreach (Face compare_face2 in Mapface)
                                         {
-                                            int check_index = 0;
-                                            foreach (Face compare_face2 in Mapface)
+                                            if (check_face2 == compare_face2)
                                             {
-                                                if (check_face2 == compare_face2)
-                                                {
-                                                    loc2 = check_index;
-                                                    break;
-                                                }
-                                                check_index = check_index + 1;
+                                                loc2 = check_index;
+                                                break;
+                                            }
+                                            check_index = check_index + 1;
+                                        }
+                                    }
+                                }
+                                #endregion
+                                if ((loc1 == 100) || (loc2 == 100))
+                                {
+                                    //即当前尺寸涉及的某个面在映射面中不存在
+                                }
+                                else
+                                {
+                                    #region 当前标注的两个面当前工序和映射工序都存在
+                                    //如果粗加工时，得到的两个面在映射标注的工序模型里都有
+                                    if ((MarkfaceTestpoint.Contains(Mapfacepoint[loc1]) == true) & (MarkfaceTestpoint.Contains(Mapfacepoint[loc2]) == true))
+                                    {
+                                        int num1;
+                                        num1 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc1], 0);
+                                        int num2;
+                                        num2 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc2], 0);
+                                        if ((Markfacepoint.Contains(MarkfaceTestpoint[num1]) == false) & (Markfacepoint.Contains(MarkfaceTestpoint[num2]) == false))
+                                        {
+                                            //当前标注的两个面，全部都不是制造特征体所得到的
+                                        }
+                                        else
+                                        {
+                                            Edge[] mark_edge1 = MarkfaceTest[num1].GetEdges();
+                                            Edge[] mark_edge2 = MarkfaceTest[num2].GetEdges();
+                                            Dimension markdim;
+                                            bool check;
+                                            NXFun.CheckOverDimension(MarkfaceTest[num1], MarkfaceTest[num2], Over_check_Face, out check);
+                                            if (check == false)
+                                            {
+                                                NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
+                                                Over_check_Face.Add(MarkfaceTest[num1]);
+                                                Over_check_Face.Add(MarkfaceTest[num2]);
                                             }
                                         }
                                     }
                                     #endregion
-                                    if ((loc1 == 100) || (loc2 == 100))
+                                    #region 当前标注有一个面是映射工序里存在着的
+                                    //如果有一个面是当前工序得到的，而映射尺寸的工序模型里也有
+                                    else if (MarkfaceTestpoint.Contains(Mapfacepoint[loc1]) == true)//只包含一个
                                     {
-                                        //即当前尺寸涉及的某个面在映射面中不存在
-                                    }
-                                    else
-                                    {
-                                        #region 当前标注的两个面当前工序和映射工序都存在
-                                        //如果粗加工时，得到的两个面在映射标注的工序模型里都有
-                                        if ((MarkfaceTestpoint.Contains(Mapfacepoint[loc1]) == true) & (MarkfaceTestpoint.Contains(Mapfacepoint[loc2]) == true))
+                                        double[] counts = MarkfaceTestpoint.ToArray();
+                                        int count = counts.Length;
+                                        int num1;
+                                        num1 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc1], 0);
+                                        int num2;
+                                        num2 = loc2;
+                                        if ((num2 < count) & (num1 != num2))
                                         {
-                                            int num1;
-                                            num1 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc1], 0);
-                                            int num2;
-                                            num2 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc2], 0);
-                                            if ((Markfacepoint.Contains(MarkfaceTestpoint[num1]) == false) & (Markfacepoint.Contains(MarkfaceTestpoint[num2]) == false))
+                                            bool check;
+                                            Edge[] mark_edge1 = MarkfaceTest[num1].GetEdges();
+                                            Edge[] mark_edge2 = MarkfaceTest[num2].GetEdges();
+                                            NXFun.CheckOverDimension(MarkfaceTest[num1], MarkfaceTest[num2], Over_check_Face, out check);
+                                            if (check == false)
                                             {
-                                                //当前标注的两个面，全部都不是制造特征体所得到的
-                                            }
-                                            else
-                                            {
-                                                Edge[] mark_edge1 = MarkfaceTest[num1].GetEdges();
-                                                Edge[] mark_edge2 = MarkfaceTest[num2].GetEdges();
                                                 Dimension markdim;
-                                                bool check;
-                                                NXFun.CheckOverDimension(MarkfaceTest[num1], MarkfaceTest[num2], Over_check_Face, out check);
-                                                if (check == false)
-                                                {
-                                                    NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
-                                                    Over_check_Face.Add(MarkfaceTest[num1]);
-                                                    Over_check_Face.Add(MarkfaceTest[num2]);
-                                                }
+                                                NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
+                                                Over_check_Face.Add(MarkfaceTest[num1]);
+                                                Over_check_Face.Add(MarkfaceTest[num2]);
                                             }
                                         }
-                                        #endregion
-                                        #region 当前标注有一个面是映射工序里存在着的
-                                        //如果有一个面是当前工序得到的，而映射尺寸的工序模型里也有
-                                        else if (MarkfaceTestpoint.Contains(Mapfacepoint[loc1]) == true)//只包含一个
-                                        {
-                                            double[] counts = MarkfaceTestpoint.ToArray();
-                                            int count = counts.Length;
-                                            int num1;
-                                            num1 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc1], 0);
-                                            int num2;
-                                            num2 = loc2;
-                                            if ((num2 < count) & (num1 != num2))
-                                            {
-                                                bool check;
-                                                Edge[] mark_edge1 = MarkfaceTest[num1].GetEdges();
-                                                Edge[] mark_edge2 = MarkfaceTest[num2].GetEdges();
-                                                NXFun.CheckOverDimension(MarkfaceTest[num1], MarkfaceTest[num2], Over_check_Face, out check);
-                                                if (check == false)
-                                                {
-                                                    Dimension markdim;
-                                                    NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
-                                                    Over_check_Face.Add(MarkfaceTest[num1]);
-                                                    Over_check_Face.Add(MarkfaceTest[num2]);
-                                                }
-                                            }
-                                        }
-                                        else if (MarkfaceTestpoint.Contains(Mapfacepoint[loc2]) == true)
-                                        {
-                                            double[] counts = MarkfaceTestpoint.ToArray();
-                                            int count = counts.Length;
-                                            int num2;
-                                            num2 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc2], 0);
-                                            int num1;
-                                            num1 = loc1;
-                                            if ((num1 < count) & (num1 != num2))
-                                            {
-                                                bool check;
-                                                Edge[] mark_edge1 = MarkfaceTest[num1].GetEdges();
-                                                Edge[] mark_edge2 = MarkfaceTest[num2].GetEdges();
-                                                NXFun.CheckOverDimension(MarkfaceTest[num1], MarkfaceTest[num2], Over_check_Face, out check);
-                                                if (check == false)
-                                                {
-                                                    Dimension markdim;
-                                                    NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
-                                                    Over_check_Face.Add(MarkfaceTest[num1]);
-                                                    Over_check_Face.Add(MarkfaceTest[num2]);
-                                                }
-                                            }
-                                        }
-                                        #endregion
-                                        #region 两个面均不是当前工序和映射工序的公共面,那么就按照顺序来
-                                        else if ((MarkfaceTestpoint.Contains(Mapfacepoint[loc1]) == false) & (MarkfaceTestpoint.Contains(Mapfacepoint[loc2]) == false))
-                                        {
-                                            double[] counts = Markfacepoint.ToArray();
-                                            int count = counts.Length;
-                                            if ((loc1 < count) & (loc2 < count) & (loc1 != loc2))
-                                            {
-                                                bool check;
-                                                Edge[] mark_edge1 = Markface[loc1].GetEdges();
-                                                Edge[] mark_edge2 = Markface[loc2].GetEdges();
-                                                NXFun.CheckOverDimension(MarkfaceTest[loc1], MarkfaceTest[loc2], Over_check_Face, out check);
-                                                if (check == false)
-                                                {
-                                                    Dimension markdim;
-                                                    NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
-                                                    Over_check_Face.Add(MarkfaceTest[loc1]);
-                                                    Over_check_Face.Add(MarkfaceTest[loc2]);
-                                                }
-                                            }
-                                        }
-                                        #endregion
                                     }
+                                    else if (MarkfaceTestpoint.Contains(Mapfacepoint[loc2]) == true)
+                                    {
+                                        double[] counts = MarkfaceTestpoint.ToArray();
+                                        int count = counts.Length;
+                                        int num2;
+                                        num2 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc2], 0);
+                                        int num1;
+                                        num1 = loc1;
+                                        if ((num1 < count) & (num1 != num2))
+                                        {
+                                            bool check;
+                                            Edge[] mark_edge1 = MarkfaceTest[num1].GetEdges();
+                                            Edge[] mark_edge2 = MarkfaceTest[num2].GetEdges();
+                                            NXFun.CheckOverDimension(MarkfaceTest[num1], MarkfaceTest[num2], Over_check_Face, out check);
+                                            if (check == false)
+                                            {
+                                                Dimension markdim;
+                                                NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
+                                                Over_check_Face.Add(MarkfaceTest[num1]);
+                                                Over_check_Face.Add(MarkfaceTest[num2]);
+                                            }
+                                        }
+                                    }
+                                    #endregion
+                                    #region 两个面均不是当前工序和映射工序的公共面,那么就按照顺序来
+                                    else if ((MarkfaceTestpoint.Contains(Mapfacepoint[loc1]) == false) & (MarkfaceTestpoint.Contains(Mapfacepoint[loc2]) == false))
+                                    {
+                                        double[] counts = Markfacepoint.ToArray();
+                                        int count = counts.Length;
+                                        if ((loc1 < count) & (loc2 < count) & (loc1 != loc2))
+                                        {
+                                            bool check;
+                                            Edge[] mark_edge1 = Markface[loc1].GetEdges();
+                                            Edge[] mark_edge2 = Markface[loc2].GetEdges();
+                                            NXFun.CheckOverDimension(MarkfaceTest[loc1], MarkfaceTest[loc2], Over_check_Face, out check);
+                                            if (check == false)
+                                            {
+                                                Dimension markdim;
+                                                NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
+                                                Over_check_Face.Add(MarkfaceTest[loc1]);
+                                                Over_check_Face.Add(MarkfaceTest[loc2]);
+                                            }
+                                        }
+                                    }
+                                    #endregion
                                 }
                             }
                             #endregion
@@ -531,158 +578,182 @@ namespace MapWindows
                             theUFSession.Assem.SetWorkPart(start_part.Tag);
                             workPartMark = theSession.Parts.Work;
                             Point3d position = new Point3d(-50, 70, 0);
+
+                            List<Dimension> help_dimension = new List<Dimension>();
+                            //按大小排序
+                            foreach (Dimension check_dimension in map_dimension)
+                            {
+                                if (check_dimension.GetType().ToString() == "NXOpen.Annotations.PmiParallelDimension")
+                                {
+                                    help_dimension.Add(check_dimension);
+                                }
+                            }
+                            Dimension trans_dimension = null;
+                            map_dimension = help_dimension.ToArray();
+                            for (int p = 0; p < map_dimension.Length; p++)
+                            {
+                                trans_dimension = map_dimension[p];
+                                for (int j = p + 1; j < map_dimension.Length; j++)
+                                {
+                                    if (trans_dimension.ComputedSize >= map_dimension[j].ComputedSize)
+                                    {
+                                        trans_dimension = map_dimension[j];
+                                        map_dimension[j] = map_dimension[p];//排序需要将大的往后放
+                                        map_dimension[p] = trans_dimension;
+                                    }
+                                }
+                            }
+
                             foreach (Dimension check_dim in map_dimension)
                             {
-                                if (check_dim.GetType().ToString() == "NXOpen.Annotations.PmiParallelDimension")
+
+                                Associativity ass1 = check_dim.GetAssociativity(1);
+                                Associativity ass2 = check_dim.GetAssociativity(2);
+                                Edge edge1 = (Edge)ass1.FirstObject;
+                                Edge edge2 = (Edge)ass2.FirstObject;
+                                //我们要找面
+                                Face[] face1 = edge1.GetFaces();
+                                Face[] face2 = edge2.GetFaces();
+                                int loc1 = 100;
+                                int loc2 = 100;
+                                #region 找标注有关的2个面在列表处的索引位置
+                                foreach (Face check_face1 in face1)
                                 {
-                                    Associativity ass1 = check_dim.GetAssociativity(1);
-                                    Associativity ass2 = check_dim.GetAssociativity(2);
-                                    Edge edge1 = (Edge)ass1.FirstObject;
-                                    Edge edge2 = (Edge)ass2.FirstObject;
-                                    //我们要找面
-                                    Face[] face1 = edge1.GetFaces();
-                                    Face[] face2 = edge2.GetFaces();
-                                    int loc1 = 100;
-                                    int loc2 = 100;
-                                    #region 找标注有关的2个面在列表处的索引位置
-                                    foreach (Face check_face1 in face1)
+                                    if (check_face1.SolidFaceType.ToString() == "Planar")
                                     {
-                                        if (check_face1.SolidFaceType.ToString() == "Planar")
+                                        int check_index = 0;
+                                        foreach (Face compare_face1 in Mapface)
                                         {
-                                            int check_index = 0;
-                                            foreach (Face compare_face1 in Mapface)
+                                            if (check_face1 == compare_face1)
                                             {
-                                                if (check_face1 == compare_face1)
-                                                {
-                                                    loc1 = check_index;
-                                                    break;
-                                                }
-                                                check_index = check_index + 1;
+                                                loc1 = check_index;
+                                                break;
                                             }
+                                            check_index = check_index + 1;
                                         }
                                     }
-                                    foreach (Face check_face2 in face2)
+                                }
+                                foreach (Face check_face2 in face2)
+                                {
+                                    if (check_face2.SolidFaceType.ToString() == "Planar")
                                     {
-                                        if (check_face2.SolidFaceType.ToString() == "Planar")
+                                        int check_index = 0;
+                                        foreach (Face compare_face2 in Mapface)
                                         {
-                                            int check_index = 0;
-                                            foreach (Face compare_face2 in Mapface)
+                                            if (check_face2 == compare_face2)
                                             {
-                                                if (check_face2 == compare_face2)
-                                                {
-                                                    loc2 = check_index;
-                                                    break;
-                                                }
-                                                check_index = check_index + 1;
+                                                loc2 = check_index;
+                                                break;
+                                            }
+                                            check_index = check_index + 1;
+                                        }
+                                    }
+                                }
+                                #endregion
+                                if ((loc1 == 100) || (loc2 == 100))
+                                {
+                                    //即当前尺寸涉及的某个面在映射面中不存在
+                                }
+                                else
+                                {
+                                    #region 当前标注的两个面当前工序和映射工序都存在
+                                    //如果粗加工时，得到的两个面在映射标注的工序模型里都有
+                                    if ((MarkfaceTestpoint.Contains(Mapfacepoint[loc1]) == true) & (MarkfaceTestpoint.Contains(Mapfacepoint[loc2]) == true))
+                                    {
+                                        int num1;
+                                        num1 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc1], 0);
+                                        int num2;
+                                        num2 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc2], 0);
+                                        if ((Markfacepoint.Contains(MarkfaceTestpoint[num1]) == false) & (Markfacepoint.Contains(MarkfaceTestpoint[num2]) == false))
+                                        {
+                                            //当前标注的两个面，全部都不是制造特征体所得到的
+                                        }
+                                        else
+                                        {
+                                            Edge[] mark_edge1 = MarkfaceTest[num1].GetEdges();
+                                            Edge[] mark_edge2 = MarkfaceTest[num2].GetEdges();
+                                            Dimension markdim;
+                                            bool check;
+                                            NXFun.CheckOverDimension(MarkfaceTest[num1], MarkfaceTest[num2], Over_check_Face, out check);
+                                            if (check == false)
+                                            {
+                                                NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
+                                                Over_check_Face.Add(MarkfaceTest[num1]);
+                                                Over_check_Face.Add(MarkfaceTest[num2]);
                                             }
                                         }
                                     }
                                     #endregion
-                                    if ((loc1 == 100) || (loc2 == 100))
+                                    #region 当前标注有一个面是映射工序里存在着的
+                                    //如果有一个面是当前工序得到的，而映射尺寸的工序模型里也有
+                                    else if (MarkfaceTestpoint.Contains(Mapfacepoint[loc1]) == true)//只包含一个
                                     {
-                                        //即当前尺寸涉及的某个面在映射面中不存在
-                                    }
-                                    else
-                                    {
-                                        #region 当前标注的两个面当前工序和映射工序都存在
-                                        //如果粗加工时，得到的两个面在映射标注的工序模型里都有
-                                        if ((MarkfaceTestpoint.Contains(Mapfacepoint[loc1]) == true) & (MarkfaceTestpoint.Contains(Mapfacepoint[loc2]) == true))
+                                        double[] counts = MarkfaceTestpoint.ToArray();
+                                        int count = counts.Length;
+                                        int num1;
+                                        num1 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc1], 0);
+                                        int num2;
+                                        num2 = loc2;
+                                        if ((num2 < count) & (num1 != num2))
                                         {
-                                            int num1;
-                                            num1 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc1], 0);
-                                            int num2;
-                                            num2 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc2], 0);
-                                            if ((Markfacepoint.Contains(MarkfaceTestpoint[num1]) == false) & (Markfacepoint.Contains(MarkfaceTestpoint[num2]) == false))
+                                            bool check;
+                                            Edge[] mark_edge1 = MarkfaceTest[num1].GetEdges();
+                                            Edge[] mark_edge2 = MarkfaceTest[num2].GetEdges();
+                                            NXFun.CheckOverDimension(MarkfaceTest[num1], MarkfaceTest[num2], Over_check_Face, out check);
+                                            if (check == false)
                                             {
-                                                //当前标注的两个面，全部都不是制造特征体所得到的
-                                            }
-                                            else
-                                            {
-                                                Edge[] mark_edge1 = MarkfaceTest[num1].GetEdges();
-                                                Edge[] mark_edge2 = MarkfaceTest[num2].GetEdges();
                                                 Dimension markdim;
-                                                bool check;
-                                                NXFun.CheckOverDimension(MarkfaceTest[num1], MarkfaceTest[num2], Over_check_Face, out check);
-                                                if (check == false)
-                                                {
-                                                    NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
-                                                    Over_check_Face.Add(MarkfaceTest[num1]);
-                                                    Over_check_Face.Add(MarkfaceTest[num2]);
-                                                }
+                                                NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
+                                                Over_check_Face.Add(MarkfaceTest[num1]);
+                                                Over_check_Face.Add(MarkfaceTest[num2]);
                                             }
                                         }
-                                        #endregion
-                                        #region 当前标注有一个面是映射工序里存在着的
-                                        //如果有一个面是当前工序得到的，而映射尺寸的工序模型里也有
-                                        else if (MarkfaceTestpoint.Contains(Mapfacepoint[loc1]) == true)//只包含一个
-                                        {
-                                            double[] counts = MarkfaceTestpoint.ToArray();
-                                            int count = counts.Length;
-                                            int num1;
-                                            num1 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc1], 0);
-                                            int num2;
-                                            num2 = loc2;
-                                            if ((num2 < count) & (num1 != num2))
-                                            {
-                                                bool check;
-                                                Edge[] mark_edge1 = MarkfaceTest[num1].GetEdges();
-                                                Edge[] mark_edge2 = MarkfaceTest[num2].GetEdges();
-                                                NXFun.CheckOverDimension(MarkfaceTest[num1], MarkfaceTest[num2], Over_check_Face, out check);
-                                                if (check == false)
-                                                {
-                                                    Dimension markdim;
-                                                    NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
-                                                    Over_check_Face.Add(MarkfaceTest[num1]);
-                                                    Over_check_Face.Add(MarkfaceTest[num2]);
-                                                }
-                                            }
-                                        }
-                                        else if (MarkfaceTestpoint.Contains(Mapfacepoint[loc2]) == true)
-                                        {
-                                            double[] counts = MarkfaceTestpoint.ToArray();
-                                            int count = counts.Length;
-                                            int num2;
-                                            num2 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc2], 0);
-                                            int num1;
-                                            num1 = loc1;
-                                            if ((num1 < count) & (num1 != num2))
-                                            {
-                                                bool check;
-                                                Edge[] mark_edge1 = MarkfaceTest[num1].GetEdges();
-                                                Edge[] mark_edge2 = MarkfaceTest[num2].GetEdges();
-                                                NXFun.CheckOverDimension(MarkfaceTest[num1], MarkfaceTest[num2], Over_check_Face, out check);
-                                                if (check == false)
-                                                {
-                                                    Dimension markdim;
-                                                    NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
-                                                    Over_check_Face.Add(MarkfaceTest[num1]);
-                                                    Over_check_Face.Add(MarkfaceTest[num2]);
-                                                }
-                                            }
-                                        }
-                                        #endregion
-                                        #region 两个面均不是当前工序和映射工序的公共面,那么就按照顺序来
-                                        else if ((MarkfaceTestpoint.Contains(Mapfacepoint[loc1]) == false) & (MarkfaceTestpoint.Contains(Mapfacepoint[loc2]) == false))
-                                        {
-                                            double[] counts = Markfacepoint.ToArray();
-                                            int count = counts.Length;
-                                            if ((loc1 < count) & (loc2 < count) & (loc1 != loc2))
-                                            {
-                                                bool check;
-                                                Edge[] mark_edge1 = Markface[loc1].GetEdges();
-                                                Edge[] mark_edge2 = Markface[loc2].GetEdges();
-                                                NXFun.CheckOverDimension(MarkfaceTest[loc1], MarkfaceTest[loc2], Over_check_Face, out check);
-                                                if (check == false)
-                                                {
-                                                    Dimension markdim;
-                                                    NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
-                                                    Over_check_Face.Add(MarkfaceTest[loc1]);
-                                                    Over_check_Face.Add(MarkfaceTest[loc2]);
-                                                }
-                                            }
-                                        }
-                                        #endregion
                                     }
+                                    else if (MarkfaceTestpoint.Contains(Mapfacepoint[loc2]) == true)
+                                    {
+                                        double[] counts = MarkfaceTestpoint.ToArray();
+                                        int count = counts.Length;
+                                        int num2;
+                                        num2 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc2], 0);
+                                        int num1;
+                                        num1 = loc1;
+                                        if ((num1 < count) & (num1 != num2))
+                                        {
+                                            bool check;
+                                            Edge[] mark_edge1 = MarkfaceTest[num1].GetEdges();
+                                            Edge[] mark_edge2 = MarkfaceTest[num2].GetEdges();
+                                            NXFun.CheckOverDimension(MarkfaceTest[num1], MarkfaceTest[num2], Over_check_Face, out check);
+                                            if (check == false)
+                                            {
+                                                Dimension markdim;
+                                                NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
+                                                Over_check_Face.Add(MarkfaceTest[num1]);
+                                                Over_check_Face.Add(MarkfaceTest[num2]);
+                                            }
+                                        }
+                                    }
+                                    #endregion
+                                    #region 两个面均不是当前工序和映射工序的公共面,那么就按照顺序来
+                                    else if ((MarkfaceTestpoint.Contains(Mapfacepoint[loc1]) == false) & (MarkfaceTestpoint.Contains(Mapfacepoint[loc2]) == false))
+                                    {
+                                        double[] counts = Markfacepoint.ToArray();
+                                        int count = counts.Length;
+                                        if ((loc1 < count) & (loc2 < count) & (loc1 != loc2))
+                                        {
+                                            bool check;
+                                            Edge[] mark_edge1 = Markface[loc1].GetEdges();
+                                            Edge[] mark_edge2 = Markface[loc2].GetEdges();
+                                            NXFun.CheckOverDimension(MarkfaceTest[loc1], MarkfaceTest[loc2], Over_check_Face, out check);
+                                            if (check == false)
+                                            {
+                                                Dimension markdim;
+                                                NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
+                                                Over_check_Face.Add(MarkfaceTest[loc1]);
+                                                Over_check_Face.Add(MarkfaceTest[loc2]);
+                                            }
+                                        }
+                                    }
+                                    #endregion
                                 }
                             }
                             #endregion
@@ -781,130 +852,153 @@ namespace MapWindows
                                 theUFSession.Assem.SetWorkPart(start_part.Tag);
                                 workPartMark = theSession.Parts.Work;
                                 Point3d position = new Point3d(-50, 70, 0);
+
+                                List<Dimension> help_dimension = new List<Dimension>();
+                                //按大小排序
+                                foreach (Dimension check_dimension in map_dimension)
+                                {
+                                    if (check_dimension.GetType().ToString() == "NXOpen.Annotations.PmiParallelDimension")
+                                    {
+                                        help_dimension.Add(check_dimension);
+                                    }
+                                }
+                                Dimension trans_dimension = null;
+                                map_dimension = help_dimension.ToArray();
+                                for (int p = 0; p < map_dimension.Length; p++)
+                                {
+                                    trans_dimension = map_dimension[p];
+                                    for (int j = p + 1; j < map_dimension.Length; j++)
+                                    {
+                                        if (trans_dimension.ComputedSize >= map_dimension[j].ComputedSize)
+                                        {
+                                            trans_dimension = map_dimension[j];
+                                            map_dimension[j] = map_dimension[p];//排序需要将大的往后放
+                                            map_dimension[p] = trans_dimension;
+                                        }
+                                    }
+                                }
+
                                 foreach (Dimension check_dim in map_dimension)
                                 {
-                                    if (check_dim.GetType().ToString() == "NXOpen.Annotations.PmiParallelDimension")
+                                    Associativity ass1 = check_dim.GetAssociativity(1);
+                                    Associativity ass2 = check_dim.GetAssociativity(2);
+                                    Edge edge1 = (Edge)ass1.FirstObject;
+                                    Edge edge2 = (Edge)ass2.FirstObject;
+                                    //我们要找面
+                                    Face[] face1 = edge1.GetFaces();
+                                    Face[] face2 = edge2.GetFaces();
+                                    int loc1 = 100;
+                                    int loc2 = 100;
+                                    #region 找标注有关的2个面在列表处的索引位置
+                                    foreach (Face check_face1 in face1)
                                     {
-                                        Associativity ass1 = check_dim.GetAssociativity(1);
-                                        Associativity ass2 = check_dim.GetAssociativity(2);
-                                        Edge edge1 = (Edge)ass1.FirstObject;
-                                        Edge edge2 = (Edge)ass2.FirstObject;
-                                        //我们要找面
-                                        Face[] face1 = edge1.GetFaces();
-                                        Face[] face2 = edge2.GetFaces();
-                                        int loc1 = 100;
-                                        int loc2 = 100;
-                                        #region 找标注有关的2个面在列表处的索引位置
-                                        foreach (Face check_face1 in face1)
+                                        if (check_face1.SolidFaceType.ToString() == "Planar")
                                         {
-                                            if (check_face1.SolidFaceType.ToString() == "Planar")
+                                            int check_index = 0;
+                                            foreach (Face compare_face1 in Mapface)
                                             {
-                                                int check_index = 0;
-                                                foreach (Face compare_face1 in Mapface)
+                                                if (check_face1 == compare_face1)
                                                 {
-                                                    if (check_face1 == compare_face1)
-                                                    {
-                                                        loc1 = check_index;
-                                                        break;
-                                                    }
-                                                    check_index = check_index + 1;
+                                                    loc1 = check_index;
+                                                    break;
                                                 }
+                                                check_index = check_index + 1;
                                             }
                                         }
-                                        foreach (Face check_face2 in face2)
+                                    }
+                                    foreach (Face check_face2 in face2)
+                                    {
+                                        if (check_face2.SolidFaceType.ToString() == "Planar")
                                         {
-                                            if (check_face2.SolidFaceType.ToString() == "Planar")
+                                            int check_index = 0;
+                                            foreach (Face compare_face2 in Mapface)
                                             {
-                                                int check_index = 0;
-                                                foreach (Face compare_face2 in Mapface)
+                                                if (check_face2 == compare_face2)
                                                 {
-                                                    if (check_face2 == compare_face2)
-                                                    {
-                                                        loc2 = check_index;
-                                                        break;
-                                                    }
-                                                    check_index = check_index + 1;
+                                                    loc2 = check_index;
+                                                    break;
                                                 }
+                                                check_index = check_index + 1;
+                                            }
+                                        }
+                                    }
+                                    #endregion
+                                    if ((loc1 == 100) || (loc2 == 100))
+                                    {
+                                        //即当前尺寸涉及的某个面在映射面中不存在
+                                    }
+                                    else
+                                    {
+                                        #region 当前标注的两个面当前工序和映射工序都存在
+                                        //如果粗加工时，得到的两个面在映射标注的工序模型里都有
+                                        if ((MarkfaceTestpoint.Contains(Mapfacepoint[loc1]) == true) & (MarkfaceTestpoint.Contains(Mapfacepoint[loc2]) == true))
+                                        {
+                                            int num1;
+                                            num1 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc1], 0);
+                                            int num2;
+                                            num2 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc2], 0);
+                                            if ((Markfacepoint.Contains(MarkfaceTestpoint[num1]) == false) & (Markfacepoint.Contains(MarkfaceTestpoint[num2]) == false))
+                                            {
+                                                //当前标注的两个面，全部都不是制造特征体所得到的
+                                            }
+                                            else
+                                            {
+                                                Edge[] mark_edge1 = MarkfaceTest[num1].GetEdges();
+                                                Edge[] mark_edge2 = MarkfaceTest[num2].GetEdges();
+                                                Dimension markdim;
+                                                NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
                                             }
                                         }
                                         #endregion
-                                        if ((loc1 == 100) || (loc2 == 100))
+                                        #region 当前标注有一个面是映射工序里存在着的
+                                        //如果有一个面是当前工序得到的，而映射尺寸的工序模型里也有
+                                        else if (MarkfaceTestpoint.Contains(Mapfacepoint[loc1]) == true)//只包含一个
                                         {
-                                            //即当前尺寸涉及的某个面在映射面中不存在
+                                            double[] counts = MarkfaceTestpoint.ToArray();
+                                            int count = counts.Length;
+                                            int num1;
+                                            num1 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc1], 0);
+                                            int num2;
+                                            num2 = loc2;
+                                            if ((num2 < count) & (num1 != num2))
+                                            {
+                                                Edge[] mark_edge1 = MarkfaceTest[num1].GetEdges();
+                                                Edge[] mark_edge2 = MarkfaceTest[num2].GetEdges();
+                                                Dimension markdim;
+                                                NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
+                                            }
                                         }
-                                        else
+                                        else if (MarkfaceTestpoint.Contains(Mapfacepoint[loc2]) == true)
                                         {
-                                            #region 当前标注的两个面当前工序和映射工序都存在
-                                            //如果粗加工时，得到的两个面在映射标注的工序模型里都有
-                                            if ((MarkfaceTestpoint.Contains(Mapfacepoint[loc1]) == true) & (MarkfaceTestpoint.Contains(Mapfacepoint[loc2]) == true))
+                                            double[] counts = MarkfaceTestpoint.ToArray();
+                                            int count = counts.Length;
+                                            int num2;
+                                            num2 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc2], 0);
+                                            int num1;
+                                            num1 = loc1;
+                                            if ((num1 < count) & (num1 != num2))
                                             {
-                                                int num1;
-                                                num1 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc1], 0);
-                                                int num2;
-                                                num2 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc2], 0);
-                                                if ((Markfacepoint.Contains(MarkfaceTestpoint[num1]) == false) & (Markfacepoint.Contains(MarkfaceTestpoint[num2]) == false))
-                                                {
-                                                    //当前标注的两个面，全部都不是制造特征体所得到的
-                                                }
-                                                else
-                                                {
-                                                    Edge[] mark_edge1 = MarkfaceTest[num1].GetEdges();
-                                                    Edge[] mark_edge2 = MarkfaceTest[num2].GetEdges();
-                                                    Dimension markdim;
-                                                    NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
-                                                }
+                                                Edge[] mark_edge1 = MarkfaceTest[num1].GetEdges();
+                                                Edge[] mark_edge2 = MarkfaceTest[num2].GetEdges();
+                                                Dimension markdim;
+                                                NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
                                             }
-                                            #endregion
-                                            #region 当前标注有一个面是映射工序里存在着的
-                                            //如果有一个面是当前工序得到的，而映射尺寸的工序模型里也有
-                                            else if (MarkfaceTestpoint.Contains(Mapfacepoint[loc1]) == true)//只包含一个
-                                            {
-                                                double[] counts = MarkfaceTestpoint.ToArray();
-                                                int count = counts.Length;
-                                                int num1;
-                                                num1 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc1], 0);
-                                                int num2;
-                                                num2 = loc2;
-                                                if ((num2 < count) & (num1 != num2))
-                                                {
-                                                    Edge[] mark_edge1 = MarkfaceTest[num1].GetEdges();
-                                                    Edge[] mark_edge2 = MarkfaceTest[num2].GetEdges();
-                                                    Dimension markdim;
-                                                    NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
-                                                }
-                                            }
-                                            else if (MarkfaceTestpoint.Contains(Mapfacepoint[loc2]) == true)
-                                            {
-                                                double[] counts = MarkfaceTestpoint.ToArray();
-                                                int count = counts.Length;
-                                                int num2;
-                                                num2 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc2], 0);
-                                                int num1;
-                                                num1 = loc1;
-                                                if ((num1 < count) & (num1 != num2))
-                                                {
-                                                    Edge[] mark_edge1 = MarkfaceTest[num1].GetEdges();
-                                                    Edge[] mark_edge2 = MarkfaceTest[num2].GetEdges();
-                                                    Dimension markdim;
-                                                    NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
-                                                }
-                                            }
-                                            #endregion
-                                            #region 两个面均不是当前工序和映射工序的公共面,那么就按照顺序来
-                                            else if ((MarkfaceTestpoint.Contains(Mapfacepoint[loc1]) == false) & (MarkfaceTestpoint.Contains(Mapfacepoint[loc2]) == false))
-                                            {
-                                                double[] counts = Markfacepoint.ToArray();
-                                                int count = counts.Length;
-                                                if ((loc1 < count) & (loc2 < count) & (loc1 != loc2))
-                                                {
-                                                    Edge[] mark_edge1 = Markface[loc1].GetEdges();
-                                                    Edge[] mark_edge2 = Markface[loc2].GetEdges();
-                                                    Dimension markdim;
-                                                    NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
-                                                }
-                                            }
-                                            #endregion
                                         }
+                                        #endregion
+                                        #region 两个面均不是当前工序和映射工序的公共面,那么就按照顺序来
+                                        else if ((MarkfaceTestpoint.Contains(Mapfacepoint[loc1]) == false) & (MarkfaceTestpoint.Contains(Mapfacepoint[loc2]) == false))
+                                        {
+                                            double[] counts = Markfacepoint.ToArray();
+                                            int count = counts.Length;
+                                            if ((loc1 < count) & (loc2 < count) & (loc1 != loc2))
+                                            {
+                                                Edge[] mark_edge1 = Markface[loc1].GetEdges();
+                                                Edge[] mark_edge2 = Markface[loc2].GetEdges();
+                                                Dimension markdim;
+                                                NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
+                                            }
+                                        }
+                                        #endregion
                                     }
                                 }
                                 #endregion
@@ -928,130 +1022,153 @@ namespace MapWindows
                                 int mark_face_num = mark_face_in_target.Length;
                                 theUFSession.Assem.SetWorkPart(start_part.Tag);
                                 workPartMark = theSession.Parts.Work;
+
+                                List<Dimension> help_dimension = new List<Dimension>();
+                                //按大小排序
+                                foreach (Dimension check_dimension in map_dimension)
+                                {
+                                    if (check_dimension.GetType().ToString() == "NXOpen.Annotations.PmiParallelDimension")
+                                    {
+                                        help_dimension.Add(check_dimension);
+                                    }
+                                }
+                                Dimension trans_dimension = null;
+                                map_dimension = help_dimension.ToArray();
+                                for (int p = 0; p < map_dimension.Length; p++)
+                                {
+                                    trans_dimension = map_dimension[p];
+                                    for (int j = p + 1; j < map_dimension.Length; j++)
+                                    {
+                                        if (trans_dimension.ComputedSize >= map_dimension[j].ComputedSize)
+                                        {
+                                            trans_dimension = map_dimension[j];
+                                            map_dimension[j] = map_dimension[p];//排序需要将大的往后放
+                                            map_dimension[p] = trans_dimension;
+                                        }
+                                    }
+                                }
+
                                 foreach (Dimension check_dim in map_dimension)
                                 {
-                                    if (check_dim.GetType().ToString() == "NXOpen.Annotations.PmiParallelDimension")
+                                    Associativity ass1 = check_dim.GetAssociativity(1);
+                                    Associativity ass2 = check_dim.GetAssociativity(2);
+                                    Edge edge1 = (Edge)ass1.FirstObject;
+                                    Edge edge2 = (Edge)ass2.FirstObject;
+                                    //我们要找面
+                                    Face[] face1 = edge1.GetFaces();
+                                    Face[] face2 = edge2.GetFaces();
+                                    int loc1 = 100;
+                                    int loc2 = 100;
+                                    #region 找标注有关的2个面在列表处的索引位置
+                                    foreach (Face check_face1 in face1)
                                     {
-                                        Associativity ass1 = check_dim.GetAssociativity(1);
-                                        Associativity ass2 = check_dim.GetAssociativity(2);
-                                        Edge edge1 = (Edge)ass1.FirstObject;
-                                        Edge edge2 = (Edge)ass2.FirstObject;
-                                        //我们要找面
-                                        Face[] face1 = edge1.GetFaces();
-                                        Face[] face2 = edge2.GetFaces();
-                                        int loc1 = 100;
-                                        int loc2 = 100;
-                                        #region 找标注有关的2个面在列表处的索引位置
-                                        foreach (Face check_face1 in face1)
+                                        if (check_face1.SolidFaceType.ToString() == "Planar")
                                         {
-                                            if (check_face1.SolidFaceType.ToString() == "Planar")
+                                            int check_index = 0;
+                                            foreach (Face compare_face1 in Mapface)
                                             {
-                                                int check_index = 0;
-                                                foreach (Face compare_face1 in Mapface)
+                                                if (check_face1 == compare_face1)
                                                 {
-                                                    if (check_face1 == compare_face1)
-                                                    {
-                                                        loc1 = check_index;
-                                                        break;
-                                                    }
-                                                    check_index = check_index + 1;
+                                                    loc1 = check_index;
+                                                    break;
                                                 }
+                                                check_index = check_index + 1;
                                             }
                                         }
-                                        foreach (Face check_face2 in face2)
+                                    }
+                                    foreach (Face check_face2 in face2)
+                                    {
+                                        if (check_face2.SolidFaceType.ToString() == "Planar")
                                         {
-                                            if (check_face2.SolidFaceType.ToString() == "Planar")
+                                            int check_index = 0;
+                                            foreach (Face compare_face2 in Mapface)
                                             {
-                                                int check_index = 0;
-                                                foreach (Face compare_face2 in Mapface)
+                                                if (check_face2 == compare_face2)
                                                 {
-                                                    if (check_face2 == compare_face2)
-                                                    {
-                                                        loc2 = check_index;
-                                                        break;
-                                                    }
-                                                    check_index = check_index + 1;
+                                                    loc2 = check_index;
+                                                    break;
                                                 }
+                                                check_index = check_index + 1;
+                                            }
+                                        }
+                                    }
+                                    #endregion
+                                    if ((loc1 == 100) || (loc2 == 100))
+                                    {
+                                        //即当前尺寸涉及的某个面在映射面中不存在
+                                    }
+                                    else
+                                    {
+                                        #region 当前标注的两个面当前工序和映射工序都存在
+                                        //如果粗加工时，得到的两个面在映射标注的工序模型里都有
+                                        if ((MarkfaceTestpoint.Contains(Mapfacepoint[loc1]) == true) & (MarkfaceTestpoint.Contains(Mapfacepoint[loc2]) == true))
+                                        {
+                                            int num1;
+                                            num1 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc1], 0);
+                                            int num2;
+                                            num2 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc2], 0);
+                                            if ((Markfacepoint.Contains(MarkfaceTestpoint[num1]) == false) & (Markfacepoint.Contains(MarkfaceTestpoint[num2]) == false))
+                                            {
+                                                //当前标注的两个面，全部都不是制造特征体所得到的
+                                            }
+                                            else
+                                            {
+                                                Edge[] mark_edge1 = MarkfaceTest[num1].GetEdges();
+                                                Edge[] mark_edge2 = MarkfaceTest[num2].GetEdges();
+                                                Dimension markdim;
+                                                NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
                                             }
                                         }
                                         #endregion
-                                        if ((loc1 == 100) || (loc2 == 100))
+                                        #region 当前标注有一个面是映射工序里存在着的
+                                        //如果有一个面是当前工序得到的，而映射尺寸的工序模型里也有
+                                        else if (MarkfaceTestpoint.Contains(Mapfacepoint[loc1]) == true)//只包含一个
                                         {
-                                            //即当前尺寸涉及的某个面在映射面中不存在
+                                            double[] counts = MarkfaceTestpoint.ToArray();
+                                            int count = counts.Length;
+                                            int num1;
+                                            num1 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc1], 0);
+                                            int num2;
+                                            num2 = loc2;
+                                            if ((num2 < count) & (num1 != num2))
+                                            {
+                                                Edge[] mark_edge1 = MarkfaceTest[num1].GetEdges();
+                                                Edge[] mark_edge2 = MarkfaceTest[num2].GetEdges();
+                                                Dimension markdim;
+                                                NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
+                                            }
                                         }
-                                        else
+                                        else if (MarkfaceTestpoint.Contains(Mapfacepoint[loc2]) == true)
                                         {
-                                            #region 当前标注的两个面当前工序和映射工序都存在
-                                            //如果粗加工时，得到的两个面在映射标注的工序模型里都有
-                                            if ((MarkfaceTestpoint.Contains(Mapfacepoint[loc1]) == true) & (MarkfaceTestpoint.Contains(Mapfacepoint[loc2]) == true))
+                                            double[] counts = MarkfaceTestpoint.ToArray();
+                                            int count = counts.Length;
+                                            int num2;
+                                            num2 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc2], 0);
+                                            int num1;
+                                            num1 = loc1;
+                                            if ((num1 < count) & (num1 != num2))
                                             {
-                                                int num1;
-                                                num1 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc1], 0);
-                                                int num2;
-                                                num2 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc2], 0);
-                                                if ((Markfacepoint.Contains(MarkfaceTestpoint[num1]) == false) & (Markfacepoint.Contains(MarkfaceTestpoint[num2]) == false))
-                                                {
-                                                    //当前标注的两个面，全部都不是制造特征体所得到的
-                                                }
-                                                else
-                                                {
-                                                    Edge[] mark_edge1 = MarkfaceTest[num1].GetEdges();
-                                                    Edge[] mark_edge2 = MarkfaceTest[num2].GetEdges();
-                                                    Dimension markdim;
-                                                    NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
-                                                }
+                                                Edge[] mark_edge1 = MarkfaceTest[num1].GetEdges();
+                                                Edge[] mark_edge2 = MarkfaceTest[num2].GetEdges();
+                                                Dimension markdim;
+                                                NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
                                             }
-                                            #endregion
-                                            #region 当前标注有一个面是映射工序里存在着的
-                                            //如果有一个面是当前工序得到的，而映射尺寸的工序模型里也有
-                                            else if (MarkfaceTestpoint.Contains(Mapfacepoint[loc1]) == true)//只包含一个
-                                            {
-                                                double[] counts = MarkfaceTestpoint.ToArray();
-                                                int count = counts.Length;
-                                                int num1;
-                                                num1 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc1], 0);
-                                                int num2;
-                                                num2 = loc2;
-                                                if ((num2 < count) & (num1 != num2))
-                                                {
-                                                    Edge[] mark_edge1 = MarkfaceTest[num1].GetEdges();
-                                                    Edge[] mark_edge2 = MarkfaceTest[num2].GetEdges();
-                                                    Dimension markdim;
-                                                    NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
-                                                }
-                                            }
-                                            else if (MarkfaceTestpoint.Contains(Mapfacepoint[loc2]) == true)
-                                            {
-                                                double[] counts = MarkfaceTestpoint.ToArray();
-                                                int count = counts.Length;
-                                                int num2;
-                                                num2 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc2], 0);
-                                                int num1;
-                                                num1 = loc1;
-                                                if ((num1 < count) & (num1 != num2))
-                                                {
-                                                    Edge[] mark_edge1 = MarkfaceTest[num1].GetEdges();
-                                                    Edge[] mark_edge2 = MarkfaceTest[num2].GetEdges();
-                                                    Dimension markdim;
-                                                    NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
-                                                }
-                                            }
-                                            #endregion
-                                            #region 两个面均不是当前工序和映射工序的公共面,那么就按照顺序来
-                                            else if ((MarkfaceTestpoint.Contains(Mapfacepoint[loc1]) == false) & (MarkfaceTestpoint.Contains(Mapfacepoint[loc2]) == false))
-                                            {
-                                                double[] counts = Markfacepoint.ToArray();
-                                                int count = counts.Length;
-                                                if ((loc1 < count) & (loc2 < count) & (loc1 != loc2))
-                                                {
-                                                    Edge[] mark_edge1 = Markface[loc1].GetEdges();
-                                                    Edge[] mark_edge2 = Markface[loc2].GetEdges();
-                                                    Dimension markdim;
-                                                    NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
-                                                }
-                                            }
-                                            #endregion
                                         }
+                                        #endregion
+                                        #region 两个面均不是当前工序和映射工序的公共面,那么就按照顺序来
+                                        else if ((MarkfaceTestpoint.Contains(Mapfacepoint[loc1]) == false) & (MarkfaceTestpoint.Contains(Mapfacepoint[loc2]) == false))
+                                        {
+                                            double[] counts = Markfacepoint.ToArray();
+                                            int count = counts.Length;
+                                            if ((loc1 < count) & (loc2 < count) & (loc1 != loc2))
+                                            {
+                                                Edge[] mark_edge1 = Markface[loc1].GetEdges();
+                                                Edge[] mark_edge2 = Markface[loc2].GetEdges();
+                                                Dimension markdim;
+                                                NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
+                                            }
+                                        }
+                                        #endregion
                                     }
                                 }
                                 #endregion
@@ -1070,130 +1187,153 @@ namespace MapWindows
                                 theUFSession.Assem.SetWorkPart(start_part.Tag);
                                 workPartMark = theSession.Parts.Work;
                                 Point3d position = new Point3d(-50, 70, 0);
+
+                                List<Dimension> help_dimension = new List<Dimension>();
+                                //按大小排序
+                                foreach (Dimension check_dimension in map_dimension)
+                                {
+                                    if (check_dimension.GetType().ToString() == "NXOpen.Annotations.PmiParallelDimension")
+                                    {
+                                        help_dimension.Add(check_dimension);
+                                    }
+                                }
+                                Dimension trans_dimension = null;
+                                map_dimension = help_dimension.ToArray();
+                                for (int p = 0; p < map_dimension.Length; p++)
+                                {
+                                    trans_dimension = map_dimension[p];
+                                    for (int j = p + 1; j < map_dimension.Length; j++)
+                                    {
+                                        if (trans_dimension.ComputedSize >= map_dimension[j].ComputedSize)
+                                        {
+                                            trans_dimension = map_dimension[j];
+                                            map_dimension[j] = map_dimension[p];//排序需要将大的往后放
+                                            map_dimension[p] = trans_dimension;
+                                        }
+                                    }
+                                }
+
                                 foreach (Dimension check_dim in map_dimension)
                                 {
-                                    if (check_dim.GetType().ToString() == "NXOpen.Annotations.PmiParallelDimension")
+                                    Associativity ass1 = check_dim.GetAssociativity(1);
+                                    Associativity ass2 = check_dim.GetAssociativity(2);
+                                    Edge edge1 = (Edge)ass1.FirstObject;
+                                    Edge edge2 = (Edge)ass2.FirstObject;
+                                    //我们要找面
+                                    Face[] face1 = edge1.GetFaces();
+                                    Face[] face2 = edge2.GetFaces();
+                                    int loc1 = 100;
+                                    int loc2 = 100;
+                                    #region 找标注有关的2个面在列表处的索引位置
+                                    foreach (Face check_face1 in face1)
                                     {
-                                        Associativity ass1 = check_dim.GetAssociativity(1);
-                                        Associativity ass2 = check_dim.GetAssociativity(2);
-                                        Edge edge1 = (Edge)ass1.FirstObject;
-                                        Edge edge2 = (Edge)ass2.FirstObject;
-                                        //我们要找面
-                                        Face[] face1 = edge1.GetFaces();
-                                        Face[] face2 = edge2.GetFaces();
-                                        int loc1 = 100;
-                                        int loc2 = 100;
-                                        #region 找标注有关的2个面在列表处的索引位置
-                                        foreach (Face check_face1 in face1)
+                                        if (check_face1.SolidFaceType.ToString() == "Planar")
                                         {
-                                            if (check_face1.SolidFaceType.ToString() == "Planar")
+                                            int check_index = 0;
+                                            foreach (Face compare_face1 in Mapface)
                                             {
-                                                int check_index = 0;
-                                                foreach (Face compare_face1 in Mapface)
+                                                if (check_face1 == compare_face1)
                                                 {
-                                                    if (check_face1 == compare_face1)
-                                                    {
-                                                        loc1 = check_index;
-                                                        break;
-                                                    }
-                                                    check_index = check_index + 1;
+                                                    loc1 = check_index;
+                                                    break;
                                                 }
+                                                check_index = check_index + 1;
                                             }
                                         }
-                                        foreach (Face check_face2 in face2)
+                                    }
+                                    foreach (Face check_face2 in face2)
+                                    {
+                                        if (check_face2.SolidFaceType.ToString() == "Planar")
                                         {
-                                            if (check_face2.SolidFaceType.ToString() == "Planar")
+                                            int check_index = 0;
+                                            foreach (Face compare_face2 in Mapface)
                                             {
-                                                int check_index = 0;
-                                                foreach (Face compare_face2 in Mapface)
+                                                if (check_face2 == compare_face2)
                                                 {
-                                                    if (check_face2 == compare_face2)
-                                                    {
-                                                        loc2 = check_index;
-                                                        break;
-                                                    }
-                                                    check_index = check_index + 1;
+                                                    loc2 = check_index;
+                                                    break;
                                                 }
+                                                check_index = check_index + 1;
+                                            }
+                                        }
+                                    }
+                                    #endregion
+                                    if ((loc1 == 100) || (loc2 == 100))
+                                    {
+                                        //即当前尺寸涉及的某个面在映射面中不存在
+                                    }
+                                    else
+                                    {
+                                        #region 当前标注的两个面当前工序和映射工序都存在
+                                        //如果粗加工时，得到的两个面在映射标注的工序模型里都有
+                                        if ((MarkfaceTestpoint.Contains(Mapfacepoint[loc1]) == true) & (MarkfaceTestpoint.Contains(Mapfacepoint[loc2]) == true))
+                                        {
+                                            int num1;
+                                            num1 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc1], 0);
+                                            int num2;
+                                            num2 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc2], 0);
+                                            if ((Markfacepoint.Contains(MarkfaceTestpoint[num1]) == false) & (Markfacepoint.Contains(MarkfaceTestpoint[num2]) == false))
+                                            {
+                                                //当前标注的两个面，全部都不是制造特征体所得到的
+                                            }
+                                            else
+                                            {
+                                                Edge[] mark_edge1 = MarkfaceTest[num1].GetEdges();
+                                                Edge[] mark_edge2 = MarkfaceTest[num2].GetEdges();
+                                                Dimension markdim;
+                                                NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
                                             }
                                         }
                                         #endregion
-                                        if ((loc1 == 100) || (loc2 == 100))
+                                        #region 当前标注有一个面是映射工序里存在着的
+                                        //如果有一个面是当前工序得到的，而映射尺寸的工序模型里也有
+                                        else if (MarkfaceTestpoint.Contains(Mapfacepoint[loc1]) == true)//只包含一个
                                         {
-                                            //即当前尺寸涉及的某个面在映射面中不存在
+                                            double[] counts = MarkfaceTestpoint.ToArray();
+                                            int count = counts.Length;
+                                            int num1;
+                                            num1 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc1], 0);
+                                            int num2;
+                                            num2 = loc2;
+                                            if ((num2 < count) & (num1 != num2))
+                                            {
+                                                Edge[] mark_edge1 = MarkfaceTest[num1].GetEdges();
+                                                Edge[] mark_edge2 = MarkfaceTest[num2].GetEdges();
+                                                Dimension markdim;
+                                                NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
+                                            }
                                         }
-                                        else
+                                        else if (MarkfaceTestpoint.Contains(Mapfacepoint[loc2]) == true)
                                         {
-                                            #region 当前标注的两个面当前工序和映射工序都存在
-                                            //如果粗加工时，得到的两个面在映射标注的工序模型里都有
-                                            if ((MarkfaceTestpoint.Contains(Mapfacepoint[loc1]) == true) & (MarkfaceTestpoint.Contains(Mapfacepoint[loc2]) == true))
+                                            double[] counts = MarkfaceTestpoint.ToArray();
+                                            int count = counts.Length;
+                                            int num2;
+                                            num2 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc2], 0);
+                                            int num1;
+                                            num1 = loc1;
+                                            if ((num1 < count) & (num1 != num2))
                                             {
-                                                int num1;
-                                                num1 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc1], 0);
-                                                int num2;
-                                                num2 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc2], 0);
-                                                if ((Markfacepoint.Contains(MarkfaceTestpoint[num1]) == false) & (Markfacepoint.Contains(MarkfaceTestpoint[num2]) == false))
-                                                {
-                                                    //当前标注的两个面，全部都不是制造特征体所得到的
-                                                }
-                                                else
-                                                {
-                                                    Edge[] mark_edge1 = MarkfaceTest[num1].GetEdges();
-                                                    Edge[] mark_edge2 = MarkfaceTest[num2].GetEdges();
-                                                    Dimension markdim;
-                                                    NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
-                                                }
+                                                Edge[] mark_edge1 = MarkfaceTest[num1].GetEdges();
+                                                Edge[] mark_edge2 = MarkfaceTest[num2].GetEdges();
+                                                Dimension markdim;
+                                                NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
                                             }
-                                            #endregion
-                                            #region 当前标注有一个面是映射工序里存在着的
-                                            //如果有一个面是当前工序得到的，而映射尺寸的工序模型里也有
-                                            else if (MarkfaceTestpoint.Contains(Mapfacepoint[loc1]) == true)//只包含一个
-                                            {
-                                                double[] counts = MarkfaceTestpoint.ToArray();
-                                                int count = counts.Length;
-                                                int num1;
-                                                num1 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc1], 0);
-                                                int num2;
-                                                num2 = loc2;
-                                                if ((num2 < count) & (num1 != num2))
-                                                {
-                                                    Edge[] mark_edge1 = MarkfaceTest[num1].GetEdges();
-                                                    Edge[] mark_edge2 = MarkfaceTest[num2].GetEdges();
-                                                    Dimension markdim;
-                                                    NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
-                                                }
-                                            }
-                                            else if (MarkfaceTestpoint.Contains(Mapfacepoint[loc2]) == true)
-                                            {
-                                                double[] counts = MarkfaceTestpoint.ToArray();
-                                                int count = counts.Length;
-                                                int num2;
-                                                num2 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc2], 0);
-                                                int num1;
-                                                num1 = loc1;
-                                                if ((num1 < count) & (num1 != num2))
-                                                {
-                                                    Edge[] mark_edge1 = MarkfaceTest[num1].GetEdges();
-                                                    Edge[] mark_edge2 = MarkfaceTest[num2].GetEdges();
-                                                    Dimension markdim;
-                                                    NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
-                                                }
-                                            }
-                                            #endregion
-                                            #region 两个面均不是当前工序和映射工序的公共面,那么就按照顺序来
-                                            else if ((MarkfaceTestpoint.Contains(Mapfacepoint[loc1]) == false) & (MarkfaceTestpoint.Contains(Mapfacepoint[loc2]) == false))
-                                            {
-                                                double[] counts = Markfacepoint.ToArray();
-                                                int count = counts.Length;
-                                                if ((loc1 < count) & (loc2 < count) & (loc1 != loc2))
-                                                {
-                                                    Edge[] mark_edge1 = Markface[loc1].GetEdges();
-                                                    Edge[] mark_edge2 = Markface[loc2].GetEdges();
-                                                    Dimension markdim;
-                                                    NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
-                                                }
-                                            }
-                                            #endregion
                                         }
+                                        #endregion
+                                        #region 两个面均不是当前工序和映射工序的公共面,那么就按照顺序来
+                                        else if ((MarkfaceTestpoint.Contains(Mapfacepoint[loc1]) == false) & (MarkfaceTestpoint.Contains(Mapfacepoint[loc2]) == false))
+                                        {
+                                            double[] counts = Markfacepoint.ToArray();
+                                            int count = counts.Length;
+                                            if ((loc1 < count) & (loc2 < count) & (loc1 != loc2))
+                                            {
+                                                Edge[] mark_edge1 = Markface[loc1].GetEdges();
+                                                Edge[] mark_edge2 = Markface[loc2].GetEdges();
+                                                Dimension markdim;
+                                                NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
+                                            }
+                                        }
+                                        #endregion
                                     }
                                 }
                                 #endregion
@@ -1288,130 +1428,152 @@ namespace MapWindows
                                 theUFSession.Assem.SetWorkPart(start_part.Tag);
                                 workPartMark = theSession.Parts.Work;
                                 Point3d position = new Point3d(-50, 70, 0);
+                                List<Dimension> help_dimension = new List<Dimension>();
+                                //按大小排序
+                                foreach (Dimension check_dimension in map_dimension)
+                                {
+                                    if (check_dimension.GetType().ToString() == "NXOpen.Annotations.PmiParallelDimension")
+                                    {
+                                        help_dimension.Add(check_dimension);
+                                    }
+                                }
+                                Dimension trans_dimension = null;
+                                map_dimension = help_dimension.ToArray();
+                                for (int p = 0; p < map_dimension.Length; p++)
+                                {
+                                    trans_dimension = map_dimension[p];
+                                    for (int j = p + 1; j < map_dimension.Length; j++)
+                                    {
+                                        if (trans_dimension.ComputedSize >= map_dimension[j].ComputedSize)
+                                        {
+                                            trans_dimension = map_dimension[j];
+                                            map_dimension[j] = map_dimension[p];//排序需要将大的往后放
+                                            map_dimension[p] = trans_dimension;
+                                        }
+                                    }
+                                }
+
                                 foreach (Dimension check_dim in map_dimension)
                                 {
-                                    if (check_dim.GetType().ToString() == "NXOpen.Annotations.PmiParallelDimension")
+                                    Associativity ass1 = check_dim.GetAssociativity(1);
+                                    Associativity ass2 = check_dim.GetAssociativity(2);
+                                    Edge edge1 = (Edge)ass1.FirstObject;
+                                    Edge edge2 = (Edge)ass2.FirstObject;
+                                    //我们要找面
+                                    Face[] face1 = edge1.GetFaces();
+                                    Face[] face2 = edge2.GetFaces();
+                                    int loc1 = 100;
+                                    int loc2 = 100;
+                                    #region 找标注有关的2个面在列表处的索引位置
+                                    foreach (Face check_face1 in face1)
                                     {
-                                        Associativity ass1 = check_dim.GetAssociativity(1);
-                                        Associativity ass2 = check_dim.GetAssociativity(2);
-                                        Edge edge1 = (Edge)ass1.FirstObject;
-                                        Edge edge2 = (Edge)ass2.FirstObject;
-                                        //我们要找面
-                                        Face[] face1 = edge1.GetFaces();
-                                        Face[] face2 = edge2.GetFaces();
-                                        int loc1 = 100;
-                                        int loc2 = 100;
-                                        #region 找标注有关的2个面在列表处的索引位置
-                                        foreach (Face check_face1 in face1)
+                                        if (check_face1.SolidFaceType.ToString() == "Planar")
                                         {
-                                            if (check_face1.SolidFaceType.ToString() == "Planar")
+                                            int check_index = 0;
+                                            foreach (Face compare_face1 in Mapface)
                                             {
-                                                int check_index = 0;
-                                                foreach (Face compare_face1 in Mapface)
+                                                if (check_face1 == compare_face1)
                                                 {
-                                                    if (check_face1 == compare_face1)
-                                                    {
-                                                        loc1 = check_index;
-                                                        break;
-                                                    }
-                                                    check_index = check_index + 1;
+                                                    loc1 = check_index;
+                                                    break;
                                                 }
+                                                check_index = check_index + 1;
                                             }
                                         }
-                                        foreach (Face check_face2 in face2)
+                                    }
+                                    foreach (Face check_face2 in face2)
+                                    {
+                                        if (check_face2.SolidFaceType.ToString() == "Planar")
                                         {
-                                            if (check_face2.SolidFaceType.ToString() == "Planar")
+                                            int check_index = 0;
+                                            foreach (Face compare_face2 in Mapface)
                                             {
-                                                int check_index = 0;
-                                                foreach (Face compare_face2 in Mapface)
+                                                if (check_face2 == compare_face2)
                                                 {
-                                                    if (check_face2 == compare_face2)
-                                                    {
-                                                        loc2 = check_index;
-                                                        break;
-                                                    }
-                                                    check_index = check_index + 1;
+                                                    loc2 = check_index;
+                                                    break;
                                                 }
+                                                check_index = check_index + 1;
+                                            }
+                                        }
+                                    }
+                                    #endregion
+                                    if ((loc1 == 100) || (loc2 == 100))
+                                    {
+                                        //即当前尺寸涉及的某个面在映射面中不存在
+                                    }
+                                    else
+                                    {
+                                        #region 当前标注的两个面当前工序和映射工序都存在
+                                        //如果粗加工时，得到的两个面在映射标注的工序模型里都有
+                                        if ((MarkfaceTestpoint.Contains(Mapfacepoint[loc1]) == true) & (MarkfaceTestpoint.Contains(Mapfacepoint[loc2]) == true))
+                                        {
+                                            int num1;
+                                            num1 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc1], 0);
+                                            int num2;
+                                            num2 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc2], 0);
+                                            if ((Markfacepoint.Contains(MarkfaceTestpoint[num1]) == false) & (Markfacepoint.Contains(MarkfaceTestpoint[num2]) == false))
+                                            {
+                                                //当前标注的两个面，全部都不是制造特征体所得到的
+                                            }
+                                            else
+                                            {
+                                                Edge[] mark_edge1 = MarkfaceTest[num1].GetEdges();
+                                                Edge[] mark_edge2 = MarkfaceTest[num2].GetEdges();
+                                                Dimension markdim;
+                                                NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
                                             }
                                         }
                                         #endregion
-                                        if ((loc1 == 100) || (loc2 == 100))
+                                        #region 当前标注有一个面是映射工序里存在着的
+                                        //如果有一个面是当前工序得到的，而映射尺寸的工序模型里也有
+                                        else if (MarkfaceTestpoint.Contains(Mapfacepoint[loc1]) == true)//只包含一个
                                         {
-                                            //即当前尺寸涉及的某个面在映射面中不存在
+                                            double[] counts = MarkfaceTestpoint.ToArray();
+                                            int count = counts.Length;
+                                            int num1;
+                                            num1 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc1], 0);
+                                            int num2;
+                                            num2 = loc2;
+                                            if ((num2 < count) & (num1 != num2))
+                                            {
+                                                Edge[] mark_edge1 = MarkfaceTest[num1].GetEdges();
+                                                Edge[] mark_edge2 = MarkfaceTest[num2].GetEdges();
+                                                Dimension markdim;
+                                                NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
+                                            }
                                         }
-                                        else
+                                        else if (MarkfaceTestpoint.Contains(Mapfacepoint[loc2]) == true)
                                         {
-                                            #region 当前标注的两个面当前工序和映射工序都存在
-                                            //如果粗加工时，得到的两个面在映射标注的工序模型里都有
-                                            if ((MarkfaceTestpoint.Contains(Mapfacepoint[loc1]) == true) & (MarkfaceTestpoint.Contains(Mapfacepoint[loc2]) == true))
+                                            double[] counts = MarkfaceTestpoint.ToArray();
+                                            int count = counts.Length;
+                                            int num2;
+                                            num2 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc2], 0);
+                                            int num1;
+                                            num1 = loc1;
+                                            if ((num1 < count) & (num1 != num2))
                                             {
-                                                int num1;
-                                                num1 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc1], 0);
-                                                int num2;
-                                                num2 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc2], 0);
-                                                if ((Markfacepoint.Contains(MarkfaceTestpoint[num1]) == false) & (Markfacepoint.Contains(MarkfaceTestpoint[num2]) == false))
-                                                {
-                                                    //当前标注的两个面，全部都不是制造特征体所得到的
-                                                }
-                                                else
-                                                {
-                                                    Edge[] mark_edge1 = MarkfaceTest[num1].GetEdges();
-                                                    Edge[] mark_edge2 = MarkfaceTest[num2].GetEdges();
-                                                    Dimension markdim;
-                                                    NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
-                                                }
+                                                Edge[] mark_edge1 = MarkfaceTest[num1].GetEdges();
+                                                Edge[] mark_edge2 = MarkfaceTest[num2].GetEdges();
+                                                Dimension markdim;
+                                                NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
                                             }
-                                            #endregion
-                                            #region 当前标注有一个面是映射工序里存在着的
-                                            //如果有一个面是当前工序得到的，而映射尺寸的工序模型里也有
-                                            else if (MarkfaceTestpoint.Contains(Mapfacepoint[loc1]) == true)//只包含一个
-                                            {
-                                                double[] counts = MarkfaceTestpoint.ToArray();
-                                                int count = counts.Length;
-                                                int num1;
-                                                num1 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc1], 0);
-                                                int num2;
-                                                num2 = loc2;
-                                                if ((num2 < count) & (num1 != num2))
-                                                {
-                                                    Edge[] mark_edge1 = MarkfaceTest[num1].GetEdges();
-                                                    Edge[] mark_edge2 = MarkfaceTest[num2].GetEdges();
-                                                    Dimension markdim;
-                                                    NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
-                                                }
-                                            }
-                                            else if (MarkfaceTestpoint.Contains(Mapfacepoint[loc2]) == true)
-                                            {
-                                                double[] counts = MarkfaceTestpoint.ToArray();
-                                                int count = counts.Length;
-                                                int num2;
-                                                num2 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc2], 0);
-                                                int num1;
-                                                num1 = loc1;
-                                                if ((num1 < count) & (num1 != num2))
-                                                {
-                                                    Edge[] mark_edge1 = MarkfaceTest[num1].GetEdges();
-                                                    Edge[] mark_edge2 = MarkfaceTest[num2].GetEdges();
-                                                    Dimension markdim;
-                                                    NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
-                                                }
-                                            }
-                                            #endregion
-                                            #region 两个面均不是当前工序和映射工序的公共面,那么就按照顺序来
-                                            else if ((MarkfaceTestpoint.Contains(Mapfacepoint[loc1]) == false) & (MarkfaceTestpoint.Contains(Mapfacepoint[loc2]) == false))
-                                            {
-                                                double[] counts = Markfacepoint.ToArray();
-                                                int count = counts.Length;
-                                                if ((loc1 < count) & (loc2 < count) & (loc1 != loc2))
-                                                {
-                                                    Edge[] mark_edge1 = Markface[loc1].GetEdges();
-                                                    Edge[] mark_edge2 = Markface[loc2].GetEdges();
-                                                    Dimension markdim;
-                                                    NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
-                                                }
-                                            }
-                                            #endregion
                                         }
+                                        #endregion
+                                        #region 两个面均不是当前工序和映射工序的公共面,那么就按照顺序来
+                                        else if ((MarkfaceTestpoint.Contains(Mapfacepoint[loc1]) == false) & (MarkfaceTestpoint.Contains(Mapfacepoint[loc2]) == false))
+                                        {
+                                            double[] counts = Markfacepoint.ToArray();
+                                            int count = counts.Length;
+                                            if ((loc1 < count) & (loc2 < count) & (loc1 != loc2))
+                                            {
+                                                Edge[] mark_edge1 = Markface[loc1].GetEdges();
+                                                Edge[] mark_edge2 = Markface[loc2].GetEdges();
+                                                Dimension markdim;
+                                                NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
+                                            }
+                                        }
+                                        #endregion
                                     }
                                 }
                                 #endregion
@@ -1434,130 +1596,152 @@ namespace MapWindows
                                 int mark_face_num = mark_face_in_target.Length;
                                 theUFSession.Assem.SetWorkPart(start_part.Tag);
                                 workPartMark = theSession.Parts.Work;
+
+                                List<Dimension> help_dimension = new List<Dimension>();
+                                //按大小排序
+                                foreach (Dimension check_dimension in map_dimension)
+                                {
+                                    if (check_dimension.GetType().ToString() == "NXOpen.Annotations.PmiParallelDimension")
+                                    {
+                                        help_dimension.Add(check_dimension);
+                                    }
+                                }
+                                Dimension trans_dimension = null;
+                                map_dimension = help_dimension.ToArray();
+                                for (int p = 0; p < map_dimension.Length; p++)
+                                {
+                                    trans_dimension = map_dimension[p];
+                                    for (int j = p + 1; j < map_dimension.Length; j++)
+                                    {
+                                        if (trans_dimension.ComputedSize >= map_dimension[j].ComputedSize)
+                                        {
+                                            trans_dimension = map_dimension[j];
+                                            map_dimension[j] = map_dimension[p];//排序需要将大的往后放
+                                            map_dimension[p] = trans_dimension;
+                                        }
+                                    }
+                                }
                                 foreach (Dimension check_dim in map_dimension)
                                 {
-                                    if (check_dim.GetType().ToString() == "NXOpen.Annotations.PmiParallelDimension")
+                                    Associativity ass1 = check_dim.GetAssociativity(1);
+                                    Associativity ass2 = check_dim.GetAssociativity(2);
+                                    Edge edge1 = (Edge)ass1.FirstObject;
+                                    Edge edge2 = (Edge)ass2.FirstObject;
+                                    //我们要找面
+                                    Face[] face1 = edge1.GetFaces();
+                                    Face[] face2 = edge2.GetFaces();
+                                    int loc1 = 100;
+                                    int loc2 = 100;
+                                    #region 找标注有关的2个面在列表处的索引位置
+                                    foreach (Face check_face1 in face1)
                                     {
-                                        Associativity ass1 = check_dim.GetAssociativity(1);
-                                        Associativity ass2 = check_dim.GetAssociativity(2);
-                                        Edge edge1 = (Edge)ass1.FirstObject;
-                                        Edge edge2 = (Edge)ass2.FirstObject;
-                                        //我们要找面
-                                        Face[] face1 = edge1.GetFaces();
-                                        Face[] face2 = edge2.GetFaces();
-                                        int loc1 = 100;
-                                        int loc2 = 100;
-                                        #region 找标注有关的2个面在列表处的索引位置
-                                        foreach (Face check_face1 in face1)
+                                        if (check_face1.SolidFaceType.ToString() == "Planar")
                                         {
-                                            if (check_face1.SolidFaceType.ToString() == "Planar")
+                                            int check_index = 0;
+                                            foreach (Face compare_face1 in Mapface)
                                             {
-                                                int check_index = 0;
-                                                foreach (Face compare_face1 in Mapface)
+                                                if (check_face1 == compare_face1)
                                                 {
-                                                    if (check_face1 == compare_face1)
-                                                    {
-                                                        loc1 = check_index;
-                                                        break;
-                                                    }
-                                                    check_index = check_index + 1;
+                                                    loc1 = check_index;
+                                                    break;
                                                 }
+                                                check_index = check_index + 1;
                                             }
                                         }
-                                        foreach (Face check_face2 in face2)
+                                    }
+                                    foreach (Face check_face2 in face2)
+                                    {
+                                        if (check_face2.SolidFaceType.ToString() == "Planar")
                                         {
-                                            if (check_face2.SolidFaceType.ToString() == "Planar")
+                                            int check_index = 0;
+                                            foreach (Face compare_face2 in Mapface)
                                             {
-                                                int check_index = 0;
-                                                foreach (Face compare_face2 in Mapface)
+                                                if (check_face2 == compare_face2)
                                                 {
-                                                    if (check_face2 == compare_face2)
-                                                    {
-                                                        loc2 = check_index;
-                                                        break;
-                                                    }
-                                                    check_index = check_index + 1;
+                                                    loc2 = check_index;
+                                                    break;
                                                 }
+                                                check_index = check_index + 1;
+                                            }
+                                        }
+                                    }
+                                    #endregion
+                                    if ((loc1 == 100) || (loc2 == 100))
+                                    {
+                                        //即当前尺寸涉及的某个面在映射面中不存在
+                                    }
+                                    else
+                                    {
+                                        #region 当前标注的两个面当前工序和映射工序都存在
+                                        //如果粗加工时，得到的两个面在映射标注的工序模型里都有
+                                        if ((MarkfaceTestpoint.Contains(Mapfacepoint[loc1]) == true) & (MarkfaceTestpoint.Contains(Mapfacepoint[loc2]) == true))
+                                        {
+                                            int num1;
+                                            num1 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc1], 0);
+                                            int num2;
+                                            num2 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc2], 0);
+                                            if ((Markfacepoint.Contains(MarkfaceTestpoint[num1]) == false) & (Markfacepoint.Contains(MarkfaceTestpoint[num2]) == false))
+                                            {
+                                                //当前标注的两个面，全部都不是制造特征体所得到的
+                                            }
+                                            else
+                                            {
+                                                Edge[] mark_edge1 = MarkfaceTest[num1].GetEdges();
+                                                Edge[] mark_edge2 = MarkfaceTest[num2].GetEdges();
+                                                Dimension markdim;
+                                                NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
                                             }
                                         }
                                         #endregion
-                                        if ((loc1 == 100) || (loc2 == 100))
+                                        #region 当前标注有一个面是映射工序里存在着的
+                                        //如果有一个面是当前工序得到的，而映射尺寸的工序模型里也有
+                                        else if (MarkfaceTestpoint.Contains(Mapfacepoint[loc1]) == true)//只包含一个
                                         {
-                                            //即当前尺寸涉及的某个面在映射面中不存在
+                                            double[] counts = MarkfaceTestpoint.ToArray();
+                                            int count = counts.Length;
+                                            int num1;
+                                            num1 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc1], 0);
+                                            int num2;
+                                            num2 = loc2;
+                                            if ((num2 < count) & (num1 != num2))
+                                            {
+                                                Edge[] mark_edge1 = MarkfaceTest[num1].GetEdges();
+                                                Edge[] mark_edge2 = MarkfaceTest[num2].GetEdges();
+                                                Dimension markdim;
+                                                NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
+                                            }
                                         }
-                                        else
+                                        else if (MarkfaceTestpoint.Contains(Mapfacepoint[loc2]) == true)
                                         {
-                                            #region 当前标注的两个面当前工序和映射工序都存在
-                                            //如果粗加工时，得到的两个面在映射标注的工序模型里都有
-                                            if ((MarkfaceTestpoint.Contains(Mapfacepoint[loc1]) == true) & (MarkfaceTestpoint.Contains(Mapfacepoint[loc2]) == true))
+                                            double[] counts = MarkfaceTestpoint.ToArray();
+                                            int count = counts.Length;
+                                            int num2;
+                                            num2 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc2], 0);
+                                            int num1;
+                                            num1 = loc1;
+                                            if ((num1 < count) & (num1 != num2))
                                             {
-                                                int num1;
-                                                num1 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc1], 0);
-                                                int num2;
-                                                num2 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc2], 0);
-                                                if ((Markfacepoint.Contains(MarkfaceTestpoint[num1]) == false) & (Markfacepoint.Contains(MarkfaceTestpoint[num2]) == false))
-                                                {
-                                                    //当前标注的两个面，全部都不是制造特征体所得到的
-                                                }
-                                                else
-                                                {
-                                                    Edge[] mark_edge1 = MarkfaceTest[num1].GetEdges();
-                                                    Edge[] mark_edge2 = MarkfaceTest[num2].GetEdges();
-                                                    Dimension markdim;
-                                                    NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
-                                                }
+                                                Edge[] mark_edge1 = MarkfaceTest[num1].GetEdges();
+                                                Edge[] mark_edge2 = MarkfaceTest[num2].GetEdges();
+                                                Dimension markdim;
+                                                NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
                                             }
-                                            #endregion
-                                            #region 当前标注有一个面是映射工序里存在着的
-                                            //如果有一个面是当前工序得到的，而映射尺寸的工序模型里也有
-                                            else if (MarkfaceTestpoint.Contains(Mapfacepoint[loc1]) == true)//只包含一个
-                                            {
-                                                double[] counts = MarkfaceTestpoint.ToArray();
-                                                int count = counts.Length;
-                                                int num1;
-                                                num1 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc1], 0);
-                                                int num2;
-                                                num2 = loc2;
-                                                if ((num2 < count) & (num1 != num2))
-                                                {
-                                                    Edge[] mark_edge1 = MarkfaceTest[num1].GetEdges();
-                                                    Edge[] mark_edge2 = MarkfaceTest[num2].GetEdges();
-                                                    Dimension markdim;
-                                                    NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
-                                                }
-                                            }
-                                            else if (MarkfaceTestpoint.Contains(Mapfacepoint[loc2]) == true)
-                                            {
-                                                double[] counts = MarkfaceTestpoint.ToArray();
-                                                int count = counts.Length;
-                                                int num2;
-                                                num2 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc2], 0);
-                                                int num1;
-                                                num1 = loc1;
-                                                if ((num1 < count) & (num1 != num2))
-                                                {
-                                                    Edge[] mark_edge1 = MarkfaceTest[num1].GetEdges();
-                                                    Edge[] mark_edge2 = MarkfaceTest[num2].GetEdges();
-                                                    Dimension markdim;
-                                                    NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
-                                                }
-                                            }
-                                            #endregion
-                                            #region 两个面均不是当前工序和映射工序的公共面,那么就按照顺序来
-                                            else if ((MarkfaceTestpoint.Contains(Mapfacepoint[loc1]) == false) & (MarkfaceTestpoint.Contains(Mapfacepoint[loc2]) == false))
-                                            {
-                                                double[] counts = Markfacepoint.ToArray();
-                                                int count = counts.Length;
-                                                if ((loc1 < count) & (loc2 < count) & (loc1 != loc2))
-                                                {
-                                                    Edge[] mark_edge1 = Markface[loc1].GetEdges();
-                                                    Edge[] mark_edge2 = Markface[loc2].GetEdges();
-                                                    Dimension markdim;
-                                                    NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
-                                                }
-                                            }
-                                            #endregion
                                         }
+                                        #endregion
+                                        #region 两个面均不是当前工序和映射工序的公共面,那么就按照顺序来
+                                        else if ((MarkfaceTestpoint.Contains(Mapfacepoint[loc1]) == false) & (MarkfaceTestpoint.Contains(Mapfacepoint[loc2]) == false))
+                                        {
+                                            double[] counts = Markfacepoint.ToArray();
+                                            int count = counts.Length;
+                                            if ((loc1 < count) & (loc2 < count) & (loc1 != loc2))
+                                            {
+                                                Edge[] mark_edge1 = Markface[loc1].GetEdges();
+                                                Edge[] mark_edge2 = Markface[loc2].GetEdges();
+                                                Dimension markdim;
+                                                NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
+                                            }
+                                        }
+                                        #endregion
                                     }
                                 }
                                 #endregion
@@ -1576,130 +1760,152 @@ namespace MapWindows
                                 theUFSession.Assem.SetWorkPart(start_part.Tag);
                                 workPartMark = theSession.Parts.Work;
                                 Point3d position = new Point3d(-50, 70, 0);
+
+                                List<Dimension> help_dimension = new List<Dimension>();
+                                //按大小排序
+                                foreach (Dimension check_dimension in map_dimension)
+                                {
+                                    if (check_dimension.GetType().ToString() == "NXOpen.Annotations.PmiParallelDimension")
+                                    {
+                                        help_dimension.Add(check_dimension);
+                                    }
+                                }
+                                Dimension trans_dimension = null;
+                                map_dimension = help_dimension.ToArray();
+                                for (int p = 0; p < map_dimension.Length; p++)
+                                {
+                                    trans_dimension = map_dimension[p];
+                                    for (int j = p + 1; j < map_dimension.Length; j++)
+                                    {
+                                        if (trans_dimension.ComputedSize >= map_dimension[j].ComputedSize)
+                                        {
+                                            trans_dimension = map_dimension[j];
+                                            map_dimension[j] = map_dimension[p];//排序需要将大的往后放
+                                            map_dimension[p] = trans_dimension;
+                                        }
+                                    }
+                                }
                                 foreach (Dimension check_dim in map_dimension)
                                 {
-                                    if (check_dim.GetType().ToString() == "NXOpen.Annotations.PmiParallelDimension")
+                                    Associativity ass1 = check_dim.GetAssociativity(1);
+                                    Associativity ass2 = check_dim.GetAssociativity(2);
+                                    Edge edge1 = (Edge)ass1.FirstObject;
+                                    Edge edge2 = (Edge)ass2.FirstObject;
+                                    //我们要找面
+                                    Face[] face1 = edge1.GetFaces();
+                                    Face[] face2 = edge2.GetFaces();
+                                    int loc1 = 100;
+                                    int loc2 = 100;
+                                    #region 找标注有关的2个面在列表处的索引位置
+                                    foreach (Face check_face1 in face1)
                                     {
-                                        Associativity ass1 = check_dim.GetAssociativity(1);
-                                        Associativity ass2 = check_dim.GetAssociativity(2);
-                                        Edge edge1 = (Edge)ass1.FirstObject;
-                                        Edge edge2 = (Edge)ass2.FirstObject;
-                                        //我们要找面
-                                        Face[] face1 = edge1.GetFaces();
-                                        Face[] face2 = edge2.GetFaces();
-                                        int loc1 = 100;
-                                        int loc2 = 100;
-                                        #region 找标注有关的2个面在列表处的索引位置
-                                        foreach (Face check_face1 in face1)
+                                        if (check_face1.SolidFaceType.ToString() == "Planar")
                                         {
-                                            if (check_face1.SolidFaceType.ToString() == "Planar")
+                                            int check_index = 0;
+                                            foreach (Face compare_face1 in Mapface)
                                             {
-                                                int check_index = 0;
-                                                foreach (Face compare_face1 in Mapface)
+                                                if (check_face1 == compare_face1)
                                                 {
-                                                    if (check_face1 == compare_face1)
-                                                    {
-                                                        loc1 = check_index;
-                                                        break;
-                                                    }
-                                                    check_index = check_index + 1;
+                                                    loc1 = check_index;
+                                                    break;
                                                 }
+                                                check_index = check_index + 1;
                                             }
                                         }
-                                        foreach (Face check_face2 in face2)
+                                    }
+                                    foreach (Face check_face2 in face2)
+                                    {
+                                        if (check_face2.SolidFaceType.ToString() == "Planar")
                                         {
-                                            if (check_face2.SolidFaceType.ToString() == "Planar")
+                                            int check_index = 0;
+                                            foreach (Face compare_face2 in Mapface)
                                             {
-                                                int check_index = 0;
-                                                foreach (Face compare_face2 in Mapface)
+                                                if (check_face2 == compare_face2)
                                                 {
-                                                    if (check_face2 == compare_face2)
-                                                    {
-                                                        loc2 = check_index;
-                                                        break;
-                                                    }
-                                                    check_index = check_index + 1;
+                                                    loc2 = check_index;
+                                                    break;
                                                 }
+                                                check_index = check_index + 1;
+                                            }
+                                        }
+                                    }
+                                    #endregion
+                                    if ((loc1 == 100) || (loc2 == 100))
+                                    {
+                                        //即当前尺寸涉及的某个面在映射面中不存在
+                                    }
+                                    else
+                                    {
+                                        #region 当前标注的两个面当前工序和映射工序都存在
+                                        //如果粗加工时，得到的两个面在映射标注的工序模型里都有
+                                        if ((MarkfaceTestpoint.Contains(Mapfacepoint[loc1]) == true) & (MarkfaceTestpoint.Contains(Mapfacepoint[loc2]) == true))
+                                        {
+                                            int num1;
+                                            num1 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc1], 0);
+                                            int num2;
+                                            num2 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc2], 0);
+                                            if ((Markfacepoint.Contains(MarkfaceTestpoint[num1]) == false) & (Markfacepoint.Contains(MarkfaceTestpoint[num2]) == false))
+                                            {
+                                                //当前标注的两个面，全部都不是制造特征体所得到的
+                                            }
+                                            else
+                                            {
+                                                Edge[] mark_edge1 = MarkfaceTest[num1].GetEdges();
+                                                Edge[] mark_edge2 = MarkfaceTest[num2].GetEdges();
+                                                Dimension markdim;
+                                                NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
                                             }
                                         }
                                         #endregion
-                                        if ((loc1 == 100) || (loc2 == 100))
+                                        #region 当前标注有一个面是映射工序里存在着的
+                                        //如果有一个面是当前工序得到的，而映射尺寸的工序模型里也有
+                                        else if (MarkfaceTestpoint.Contains(Mapfacepoint[loc1]) == true)//只包含一个
                                         {
-                                            //即当前尺寸涉及的某个面在映射面中不存在
+                                            double[] counts = MarkfaceTestpoint.ToArray();
+                                            int count = counts.Length;
+                                            int num1;
+                                            num1 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc1], 0);
+                                            int num2;
+                                            num2 = loc2;
+                                            if ((num2 < count) & (num1 != num2))
+                                            {
+                                                Edge[] mark_edge1 = MarkfaceTest[num1].GetEdges();
+                                                Edge[] mark_edge2 = MarkfaceTest[num2].GetEdges();
+                                                Dimension markdim;
+                                                NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
+                                            }
                                         }
-                                        else
+                                        else if (MarkfaceTestpoint.Contains(Mapfacepoint[loc2]) == true)
                                         {
-                                            #region 当前标注的两个面当前工序和映射工序都存在
-                                            //如果粗加工时，得到的两个面在映射标注的工序模型里都有
-                                            if ((MarkfaceTestpoint.Contains(Mapfacepoint[loc1]) == true) & (MarkfaceTestpoint.Contains(Mapfacepoint[loc2]) == true))
+                                            double[] counts = MarkfaceTestpoint.ToArray();
+                                            int count = counts.Length;
+                                            int num2;
+                                            num2 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc2], 0);
+                                            int num1;
+                                            num1 = loc1;
+                                            if ((num1 < count) & (num1 != num2))
                                             {
-                                                int num1;
-                                                num1 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc1], 0);
-                                                int num2;
-                                                num2 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc2], 0);
-                                                if ((Markfacepoint.Contains(MarkfaceTestpoint[num1]) == false) & (Markfacepoint.Contains(MarkfaceTestpoint[num2]) == false))
-                                                {
-                                                    //当前标注的两个面，全部都不是制造特征体所得到的
-                                                }
-                                                else
-                                                {
-                                                    Edge[] mark_edge1 = MarkfaceTest[num1].GetEdges();
-                                                    Edge[] mark_edge2 = MarkfaceTest[num2].GetEdges();
-                                                    Dimension markdim;
-                                                    NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
-                                                }
+                                                Edge[] mark_edge1 = MarkfaceTest[num1].GetEdges();
+                                                Edge[] mark_edge2 = MarkfaceTest[num2].GetEdges();
+                                                Dimension markdim;
+                                                NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
                                             }
-                                            #endregion
-                                            #region 当前标注有一个面是映射工序里存在着的
-                                            //如果有一个面是当前工序得到的，而映射尺寸的工序模型里也有
-                                            else if (MarkfaceTestpoint.Contains(Mapfacepoint[loc1]) == true)//只包含一个
-                                            {
-                                                double[] counts = MarkfaceTestpoint.ToArray();
-                                                int count = counts.Length;
-                                                int num1;
-                                                num1 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc1], 0);
-                                                int num2;
-                                                num2 = loc2;
-                                                if ((num2 < count) & (num1 != num2))
-                                                {
-                                                    Edge[] mark_edge1 = MarkfaceTest[num1].GetEdges();
-                                                    Edge[] mark_edge2 = MarkfaceTest[num2].GetEdges();
-                                                    Dimension markdim;
-                                                    NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
-                                                }
-                                            }
-                                            else if (MarkfaceTestpoint.Contains(Mapfacepoint[loc2]) == true)
-                                            {
-                                                double[] counts = MarkfaceTestpoint.ToArray();
-                                                int count = counts.Length;
-                                                int num2;
-                                                num2 = MarkfaceTestpoint.IndexOf(Mapfacepoint[loc2], 0);
-                                                int num1;
-                                                num1 = loc1;
-                                                if ((num1 < count) & (num1 != num2))
-                                                {
-                                                    Edge[] mark_edge1 = MarkfaceTest[num1].GetEdges();
-                                                    Edge[] mark_edge2 = MarkfaceTest[num2].GetEdges();
-                                                    Dimension markdim;
-                                                    NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
-                                                }
-                                            }
-                                            #endregion
-                                            #region 两个面均不是当前工序和映射工序的公共面,那么就按照顺序来
-                                            else if ((MarkfaceTestpoint.Contains(Mapfacepoint[loc1]) == false) & (MarkfaceTestpoint.Contains(Mapfacepoint[loc2]) == false))
-                                            {
-                                                double[] counts = Markfacepoint.ToArray();
-                                                int count = counts.Length;
-                                                if ((loc1 < count) & (loc2 < count) & (loc1 != loc2))
-                                                {
-                                                    Edge[] mark_edge1 = Markface[loc1].GetEdges();
-                                                    Edge[] mark_edge2 = Markface[loc2].GetEdges();
-                                                    Dimension markdim;
-                                                    NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
-                                                }
-                                            }
-                                            #endregion
                                         }
+                                        #endregion
+                                        #region 两个面均不是当前工序和映射工序的公共面,那么就按照顺序来
+                                        else if ((MarkfaceTestpoint.Contains(Mapfacepoint[loc1]) == false) & (MarkfaceTestpoint.Contains(Mapfacepoint[loc2]) == false))
+                                        {
+                                            double[] counts = Markfacepoint.ToArray();
+                                            int count = counts.Length;
+                                            if ((loc1 < count) & (loc2 < count) & (loc1 != loc2))
+                                            {
+                                                Edge[] mark_edge1 = Markface[loc1].GetEdges();
+                                                Edge[] mark_edge2 = Markface[loc2].GetEdges();
+                                                Dimension markdim;
+                                                NXFun.createaxisdimension(mark_edge1[0], mark_edge2[0], out markdim);
+                                            }
+                                        }
+                                        #endregion
                                     }
                                 }
                                 #endregion
@@ -1712,73 +1918,7 @@ namespace MapWindows
                     #endregion
                 }
             }
-            //美观化布局
-            //#region 第一种方法
-            //foreach (string name in get_name)
-            //{
-            //    if ((name.Contains("right") == true) || (name.Contains("left") == true))
-            //    {
-            //        Part start_part = null;
-            //        start_part = (Part)theSession.Parts.FindObject(name);
-            //        theUFSession.Assem.SetWorkPart(start_part.Tag);
-            //        Part workPart = theSession.Parts.Work;
-            //        PartLoadStatus partLoadStatus1;
-            //        theSession.Parts.SetDisplay(workPart, true, true, out partLoadStatus1);
-            //        Layout layout1 = (Layout)workPart.Layouts.FindObject("L1");
-            //        ModelingView modelview = workPart.ModelingViews.WorkView;
-            //        string strModelView = modelview.Name;
-            //        string viewName = "RIGHT";
-            //        if (strModelView != viewName)
-            //        {
-            //            ModelingView modelingView1 = (ModelingView)workPart.ModelingViews.FindObject(viewName);
-            //            layout1.ReplaceView(workPart.ModelingViews.WorkView, modelingView1, true);
-            //        }
-            //        Body body = workPart.Bodies.ToArray()[0];
-            //        Dimension[] alldimension = workPart.Dimensions.ToArray();
-            //        double temp = 0;
-            //        int z = 10;
-            //        foreach (Dimension each in alldimension)
-            //        {
-            //            if (each.GetType().ToString() == "NXOpen.Annotations.PmiCylindricalDimension")
-            //            {
-            //                if (each.ComputedSize > temp)
-            //                {
-            //                    temp = each.ComputedSize;
-            //                }
-            //            }
-            //        }
-
-            //        body = workPart.Bodies.ToArray()[0];
-            //        alldimension = workPart.Dimensions.ToArray();
-            //        strModelView = modelview.Name;
-            //        viewName = "BACK";
-            //        if (strModelView != viewName)
-            //        {
-            //            ModelingView modelingView1 = (ModelingView)workPart.ModelingViews.FindObject(viewName);
-            //            layout1.ReplaceView(workPart.ModelingViews.WorkView, modelingView1, true);
-            //        }
-            //        foreach (Dimension each in alldimension)
-            //        {
-            //            if (each.GetType().ToString() == "NXOpen.Annotations.PmiParallelDimension")
-            //            {
-            //                Point3d check_point1;
-            //                check_point1 = each.AnnotationOrigin;
-            //                check_point1.Z = temp + z;
-            //                each.AnnotationOrigin = check_point1;
-            //                each.IsOriginCentered = true;
-            //                z = z + 10;
-            //            }
-            //        }
-            //    }
-            //    PartLoadStatus partLoadStatus2;
-            //    NXOpen.PartCollection.SdpsStatus status1;
-            //    Part part1 = (Part)theSession.Parts.FindObject(mother);
-            //    status1 = theSession.Parts.SetDisplay(part1, true, true, out partLoadStatus2);
-            //    partLoadStatus2.Dispose();
-            //}
-            //#endregion
-
-            #region 第二种方法,更好
+            //径向标注规划
             foreach (string name in get_name)
             {
                 if ((name.Contains("right") == true) || (name.Contains("left") == true))
@@ -1787,8 +1927,8 @@ namespace MapWindows
                     start_part = (Part)theSession.Parts.FindObject(name);
                     theUFSession.Assem.SetWorkPart(start_part.Tag);
                     Part workPart = theSession.Parts.Work;
-                    NXFun.SetDisPlay(workPart,"BACK");
-                    NXFun.Paralleldimension(workPart);
+                    NXFun.SetDisPlay(workPart, "RIGHT");
+                    NXFun.SetCylindricalDimension(workPart);//尺寸布局方法
                 }
                 PartLoadStatus partLoadStatus2;
                 NXOpen.PartCollection.SdpsStatus status1;
@@ -1796,7 +1936,27 @@ namespace MapWindows
                 status1 = theSession.Parts.SetDisplay(part1, true, true, out partLoadStatus2);
                 partLoadStatus2.Dispose();
             }
-            #endregion 
+
+            //轴类标注规划
+            foreach (string name in get_name)
+            {
+                if ((name.Contains("right") == true) || (name.Contains("left") == true))
+                {
+                    Part start_part = null;
+                    start_part = (Part)theSession.Parts.FindObject(name);
+                    theUFSession.Assem.SetWorkPart(start_part.Tag);
+                    Part workPart = theSession.Parts.Work;
+                    NXFun.SetDisPlay(workPart, "BACK");
+                    NXFun.Paralleldimension(workPart);//尺寸布局方法
+                    NXFun.ResultPara(workPart);
+                }
+                PartLoadStatus partLoadStatus2;
+                NXOpen.PartCollection.SdpsStatus status1;
+                Part part1 = (Part)theSession.Parts.FindObject(mother);
+                status1 = theSession.Parts.SetDisplay(part1, true, true, out partLoadStatus2);
+                partLoadStatus2.Dispose();
+            }
+
         }
 
         private void button2_Click(object sender, EventArgs e)//获取属性邻接图
@@ -1914,31 +2074,19 @@ namespace MapWindows
 
         private void button5_Click(object sender, EventArgs e)//对轴向布局进行轴件长度
         {
-            Part workpart = theSession.Parts.Work;
-            Body body = workpart.Bodies.ToArray()[0];
-            Face[] all_face = body.GetFaces();
-            List<double> points = new List<double>();
-            List<Face> faces = new List<Face>();
-            foreach (Face check_face in all_face)
+            Part workPart = theSession.Parts.Work;
+            Body body = workPart.Bodies.ToArray()[0];
+            Dimension[] all_dimension = workPart.Dimensions.ToArray();
+            List<Dimension> help_dimension = new List<Dimension>();
+            foreach (Dimension check_dimension in all_dimension)
             {
-                if (check_face.SolidFaceType.ToString() == "Cylindrical")
+                if (check_dimension.GetType().ToString() == "NXOpen.Annotations.PmiParallelDimension")
                 {
-                    int type;
-                    double[] point = new double[6];
-                    double[] dir = new double[5];
-                    double[] box = new double[6];
-                    double radius;
-                    double rad_data;
-                    int norm_dir;
-                    theUFSession.Modl.AskFaceData(check_face.Tag, out type, point, dir, box, out radius, out rad_data, out norm_dir);
-                    points.Add(point[0]);
-                    faces.Add(check_face);
+                    help_dimension.Add(check_dimension);
                 }
             }
-            Dimension[] all_dimension = workpart.Dimensions.ToArray();
-            double z = 10;
+            all_dimension = help_dimension.ToArray();
             Dimension check = null;
-            //按大小排序
             for (int i = 0; i < all_dimension.Length; i++)
             {
                 check = all_dimension[i];
@@ -1952,74 +2100,97 @@ namespace MapWindows
                     }
                 }
             }
-            foreach (Dimension pmidimension in all_dimension)
+            int n = all_dimension.Length;
+            double y = 0;
+            y = n * 5;
+            Point3d orgin_point = all_dimension[n - 1].AnnotationOrigin;
+            orgin_point.Z = orgin_point.Z + y;
+            all_dimension[n - 1].AnnotationOrigin = orgin_point;
+            bool[] flags = new bool[n];//默认false
+            flags[n - 1] = true;
+            for (int i = n - 2; i >= 0; i--)//所有尺寸的computerSize都是最大轴段值
             {
-                if (pmidimension.GetType().ToString() == "NXOpen.Annotations.PmiParallelDimension")
+                Dimension check1 = all_dimension[i];
+                Associativity ass1_check1 = check1.GetAssociativity(1);
+                Associativity ass2_check1 = check1.GetAssociativity(2);
+                Edge edge1 = (Edge)ass1_check1.FirstObject;
+                Edge edge2 = (Edge)ass2_check1.FirstObject;
+                Face[] face1 = edge1.GetFaces();
+                Face[] face2 = edge2.GetFaces();
+                List<Face> check_face = new List<Face>();
+                foreach (Face checkface in face1)
                 {
-                    Associativity ass1 = pmidimension.GetAssociativity(1);
-                    Associativity ass2 = pmidimension.GetAssociativity(2);
-                    Edge edge1 = (Edge)ass1.FirstObject;
-                    Edge edge2 = (Edge)ass2.FirstObject;
-                    Face[] face1 = edge1.GetFaces();
-                    Face[] face2 = edge2.GetFaces();
-                    double loc1 = 0;
-                    double loc2 = 0;
-                    //找到当前尺寸的两个平面的端面位置
-                    foreach (Face check_face1 in face1)
+                    if (checkface.SolidFaceType.ToString() == "Planar")
                     {
-                        if (check_face1.SolidFaceType.ToString() == "Planar")
+                        check_face.Add(checkface);
+                        break;
+                    }
+                }
+                foreach (Face checkface in face2)
+                {
+                    if (checkface.SolidFaceType.ToString() == "Planar")
+                    {
+                        check_face.Add(checkface);
+                        break;
+                    }
+                }
+                for (int j = i+1; j <n; j++)
+                {
+                    //check2代表已经被放置好的尺寸
+                    Dimension check2 = all_dimension[j];
+                    Associativity ass1_check2 = check2.GetAssociativity(1);
+                    Associativity ass2_check2 = check2.GetAssociativity(2);
+                    Edge edge3 = (Edge)ass1_check2.FirstObject;
+                    Edge edge4 = (Edge)ass2_check2.FirstObject;
+                    Face[] face3 = edge3.GetFaces();
+                    Face[] face4 = edge4.GetFaces();
+                    Face check2_face1 = null;
+                    Face check2_face2 = null;
+                    //必须用平面来作为判别依据，不能用边
+                    foreach (Face checkface in face3)
+                    {
+                        if (checkface.SolidFaceType.ToString() == "Planar")
                         {
-                            int type;
-                            double[] point = new double[6];
-                            double[] dir = new double[5];
-                            double[] box = new double[6];
-                            double radius;
-                            double rad_data;
-                            int norm_dir;
-                            theUFSession.Modl.AskFaceData(check_face1.Tag, out type, point, dir, box, out radius, out rad_data, out norm_dir);
-                            loc1 = point[0];
+                            check2_face1 = checkface;
                             break;
                         }
                     }
-                    foreach (Face check_face2 in face2)
+                    foreach (Face checkface in face4)
                     {
-                        if (check_face2.SolidFaceType.ToString() == "Planar")
+                        if (checkface.SolidFaceType.ToString() == "Planar")
                         {
-                            int type;
-                            double[] point = new double[6];
-                            double[] dir = new double[5];
-                            double[] box = new double[6];
-                            double radius;
-                            double rad_data;
-                            int norm_dir;
-                            theUFSession.Modl.AskFaceData(check_face2.Tag, out type, point, dir, box, out radius, out rad_data, out norm_dir);
-                            loc2 = point[0];
+                            check2_face2 = checkface;
                             break;
                         }
                     }
-                    double temp = 0;
-                    List<NXObject> delete = new List<NXObject>();
-                    foreach (double point in points)
+                    //有公共边,就根据就近原则
+                    if ((check_face.Contains(check2_face1) == true) || (check_face.Contains(check2_face2) == true))
                     {
-                        if (((point < loc1) & (point > loc2)) || ((point > loc1) & (point < loc2)))
+                        double a = (check1.ComputedSize + check2.ComputedSize) / 2;
+                        double b = Math.Abs((Math.Abs(check2.AnnotationOrigin.X) - Math.Abs(check1.AnnotationOrigin.X)));
+                        if ((a <= b) || Math.Abs(a - b) < 0.0001)
                         {
-                            Face face = faces[points.IndexOf(point)];
-                            Dimension check_points = null;
-                            Point3d helppoint = new Point3d(0, 0, 0);
-                            NXFun.Cylindricaldimension(face, helppoint, out check_points);
-                            if (temp < check_points.ComputedSize)
-                            {
-                                temp = check_points.ComputedSize;
-                            }
-                            delete.Add(check_points);
+                            Point3d check1_point = check1.AnnotationOrigin;
+                            check1_point.Z = check2.AnnotationOrigin.Z;//用来作参照
+                            check1.AnnotationOrigin = check1_point;
+                            break;
+                        }
+                        else
+                        {
+                            Point3d check1_point = check1.AnnotationOrigin;
+                            check1_point.Z = check2.AnnotationOrigin.Z - 6;
+                            check1.AnnotationOrigin = check1_point;
+                            break;
                         }
                     }
-                    NXObject[] result = delete.ToArray();
-                    NXFun.DeleteObject(result);
-                    Point3d result_point = pmidimension.AnnotationOrigin;
-                    result_point.Y = temp + z;//可能要与具体轴的方位有关
-                    pmidimension.AnnotationOrigin = result_point;
-                    z = z + 10;
+                    //没有公共边，检查是否内包含，如果不是内包含的话就跳出
+                    if (Math.Abs(check1.AnnotationOrigin.X - check2.AnnotationOrigin.X) < (check1.ComputedSize / 2 + check2.ComputedSize / 2))
+                    {
+                        Point3d check1_point = check1.AnnotationOrigin;
+                        check1_point.Z = check2.AnnotationOrigin.Z - 6;
+                        check1.AnnotationOrigin = check1_point;
+                        break;//找最近的母级
+                    }
                 }
             }
         }

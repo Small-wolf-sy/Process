@@ -21,7 +21,7 @@ namespace NXFunctions
         private static Part displayPart = theSession.Parts.Display;
         private static UI theUI = UI.GetUI();
 
-        public void SetDisPlay(Part workPart,string position)
+        public void SetDisPlay(Part workPart, string position)
         {
             PartLoadStatus partLoadStatus1;
             theSession.Parts.SetDisplay(workPart, true, true, out partLoadStatus1);
@@ -35,7 +35,6 @@ namespace NXFunctions
                 layout1.ReplaceView(workPart.ModelingViews.WorkView, modelingView1, true);
             }
         }
-
 
         #region 实现轴向标注规划
         public void Paralleldimension(Part workPart)
@@ -61,7 +60,7 @@ namespace NXFunctions
                 }
             }
             Dimension[] all_dimension = workPart.Dimensions.ToArray();
-            double z = 10;
+            //double z = 10;
             Dimension check = null;
             List<Dimension> help_dimension = new List<Dimension>();
             //按大小排序
@@ -151,13 +150,189 @@ namespace NXFunctions
                     NXObject[] result = delete.ToArray();
                     DeleteObject(result);
                     Point3d result_point = pmidimension.AnnotationOrigin;
-                    result_point.Z = temp + z;//可能要与具体轴的方位有关，在装配实例中，要改成Z，到时试试看能不能知道Xform的性质吧，比如根据Xform的方向做一个选择分支
+                    result_point.Z = temp;//可能要与具体轴的方位有关，在装配实例中，要改成Z，到时试试看能不能知道Xform的性质吧，比如根据Xform的方向做一个选择分支
                     pmidimension.AnnotationOrigin = result_point;
-                    z = z + 10;
+                    //z = z + 10;
                 }
             }
         }
-        #endregion 
+        #endregion
+
+        #region 轴向尺寸规划第二版
+        public void ResultPara(Part workPart)
+        {
+            Body body = workPart.Bodies.ToArray()[0];
+            Dimension[] all_dimension = workPart.Dimensions.ToArray();
+            List<Dimension> help_dimension = new List<Dimension>();
+            foreach (Dimension check_dimension in all_dimension)
+            {
+                if (check_dimension.GetType().ToString() == "NXOpen.Annotations.PmiParallelDimension")
+                {
+                    help_dimension.Add(check_dimension);
+                }
+            }
+            all_dimension = help_dimension.ToArray();
+            Dimension check = null;
+            for (int i = 0; i < all_dimension.Length; i++)
+            {
+                check = all_dimension[i];
+                for (int j = i + 1; j < all_dimension.Length; j++)
+                {
+                    if (check.ComputedSize >= all_dimension[j].ComputedSize)
+                    {
+                        check = all_dimension[j];
+                        all_dimension[j] = all_dimension[i];//排序需要将大的往后放
+                        all_dimension[i] = check;
+                    }
+                }
+            }
+            int n = all_dimension.Length;
+            double y = 0;
+            y = n * 3;
+            Point3d orgin_point = all_dimension[n - 1].AnnotationOrigin;
+            orgin_point.Z = orgin_point.Z + y;
+            all_dimension[n - 1].AnnotationOrigin = orgin_point;
+            bool[] flags = new bool[n];//默认false
+            flags[n - 1] = true;
+            for (int i = n - 2; i >= 0; i--)//所有尺寸的computerSize都是最大轴段值
+            {
+                Dimension check1 = all_dimension[i];
+                Associativity ass1_check1 = check1.GetAssociativity(1);
+                Associativity ass2_check1 = check1.GetAssociativity(2);
+                Edge edge1 = (Edge)ass1_check1.FirstObject;
+                Edge edge2 = (Edge)ass2_check1.FirstObject;
+                Face[] face1 = edge1.GetFaces();
+                Face[] face2 = edge2.GetFaces();
+                List<Face> check_face = new List<Face>();
+                foreach (Face checkface in face1)
+                {
+                    if (checkface.SolidFaceType.ToString() == "Planar")
+                    {
+                        check_face.Add(checkface);
+                        break;
+                    }
+                }
+                foreach (Face checkface in face2)
+                {
+                    if (checkface.SolidFaceType.ToString() == "Planar")
+                    {
+                        check_face.Add(checkface);
+                        break;
+                    }
+                }
+                for (int j = i + 1; j < n; j++)
+                {
+                    //check2代表已经被放置好的尺寸
+                    Dimension check2 = all_dimension[j];
+                    Associativity ass1_check2 = check2.GetAssociativity(1);
+                    Associativity ass2_check2 = check2.GetAssociativity(2);
+                    Edge edge3 = (Edge)ass1_check2.FirstObject;
+                    Edge edge4 = (Edge)ass2_check2.FirstObject;
+                    Face[] face3 = edge3.GetFaces();
+                    Face[] face4 = edge4.GetFaces();
+                    Face check2_face1 = null;
+                    Face check2_face2 = null;
+                    //必须用平面来作为判别依据，不能用边
+                    foreach (Face checkface in face3)
+                    {
+                        if (checkface.SolidFaceType.ToString() == "Planar")
+                        {
+                            check2_face1 = checkface;
+                            break;
+                        }
+                    }
+                    foreach (Face checkface in face4)
+                    {
+                        if (checkface.SolidFaceType.ToString() == "Planar")
+                        {
+                            check2_face2 = checkface;
+                            break;
+                        }
+                    }
+                    //有公共边,就根据就近原则
+                    if ((check_face.Contains(check2_face1) == true) || (check_face.Contains(check2_face2) == true))
+                    {
+                        double a = (check1.ComputedSize + check2.ComputedSize) / 2;
+                        double b = Math.Abs((Math.Abs(check2.AnnotationOrigin.X) - Math.Abs(check1.AnnotationOrigin.X)));
+                        if ((a <= b) || Math.Abs(a - b) < 0.0001)
+                        {
+                            Point3d check1_point = check1.AnnotationOrigin;
+                            check1_point.Z = check2.AnnotationOrigin.Z;//用来作参照
+                            check1.AnnotationOrigin = check1_point;
+                            break;//找最近的母级
+                        }
+                        else
+                        {
+                            Point3d check1_point = check1.AnnotationOrigin;
+                            check1_point.Z = check2.AnnotationOrigin.Z - 6;
+                            check1.AnnotationOrigin = check1_point;
+                            break;//找最近的母级
+                        }
+                    }
+                    //没有公共边，检查是否内包含，如果不是内包含的话就跳出
+                    if (Math.Abs(check1.AnnotationOrigin.X - check2.AnnotationOrigin.X) < (check1.ComputedSize / 2 + check2.ComputedSize / 2))
+                    {
+                        Point3d check1_point = check1.AnnotationOrigin;
+                        check1_point.Z = check2.AnnotationOrigin.Z - 6;
+                        check1.AnnotationOrigin = check1_point;
+                        break;//找最近的母级
+                    }
+                }
+            }
+        }
+        #endregion
+
+        #region 径向标注规划
+        public void SetCylindricalDimension(Part workPart)
+        {
+            Body body = workPart.Bodies.ToArray()[0];
+            Face[] all_face = body.GetFaces();
+            List<double> points = new List<double>();
+            List<Face> faces = new List<Face>();
+            Dimension[] all_dimension = workPart.Dimensions.ToArray();
+            Dimension check = null;
+            List<Dimension> help_dimension = new List<Dimension>();
+            //按大小排序
+            foreach (Dimension check_dimension in all_dimension)
+            {
+                if (check_dimension.GetType().ToString() == "NXOpen.Annotations.PmiCylindricalDimension")
+                {
+                    help_dimension.Add(check_dimension);
+                }
+            }
+            all_dimension = help_dimension.ToArray();
+            for (int i = 0; i < all_dimension.Length; i++)
+            {
+                check = all_dimension[i];
+                for (int j = i + 1; j < all_dimension.Length; j++)
+                {
+                    if (check.ComputedSize >= all_dimension[j].ComputedSize)
+                    {
+                        check = all_dimension[j];
+                        all_dimension[j] = all_dimension[i];//排序需要将大的往后放
+                        all_dimension[i] = check;
+                    }
+                }
+            }
+            //得到排序后的圆柱尺寸排序
+            double y = 10;
+            double temp = 0;
+            foreach (Dimension check_dimension in all_dimension)
+            {
+                if (check_dimension.ComputedSize > temp)
+                {
+                    temp = check_dimension.ComputedSize;
+                }
+            }
+            foreach (Dimension check_dimension in all_dimension)
+            {
+                Point3d help_point = check_dimension.AnnotationOrigin;
+                help_point.Y = temp+ y;
+                y = y + 10;
+                check_dimension.AnnotationOrigin = help_point;
+            }
+        }
+        #endregion
 
         #region 作布尔差得到去除的制造体,输出一个特征
         public void createCollector(Body targetbody, Body toolbody, out Feature succuessfeature)
@@ -297,7 +472,7 @@ namespace NXFunctions
         #endregion
 
         #region WAVE→链接→布尔差→得到接触面→标注特殊模型→获取需要根据继承来标注的轴向端面
-        public void GetMarkFace(Part start_part, Part link_part,out List<Face>Mark_Face)//模块化，这个模块的功能是能够让两个模型之间进行WAVE链接比较
+        public void GetMarkFace(Part start_part, Part link_part, out List<Face> Mark_Face)//模块化，这个模块的功能是能够让两个模型之间进行WAVE链接比较
         {
             #region 进行布尔差
             //进行链接，link_part放入start_part中
@@ -353,28 +528,23 @@ namespace NXFunctions
             Mark_Face = axis_dimension_face;//把我们要用通过继承来标注的面输出出去
             #endregion
 
-            SetDisPlay(workPart,"RIGHT");       
+            SetDisPlay(workPart, "RIGHT");
 
             #region 在这里就可以对径向进行标注,但发现因为在检查退刀槽时也进行了对比，导致径向尺寸会标注两次
-            double y = 10;
-            double temp = 0;
-
             foreach (Face mark_dia_face in dia_dimension_face)
             {
-                temp = temp + 1;
-                Point3d helppoint = new Point3d(0,0,0);
+                Point3d helppoint = new Point3d(0, 0, 0);
                 Dimension dim = null;
                 Cylindricaldimension(mark_dia_face, helppoint, out dim);
                 Point3d check_point1;
                 check_point1 = dim.AnnotationOrigin;
                 check_point1.Z = 0.0;
-                check_point1.Y = dim.ComputedSize + y;
+                check_point1.Y = dim.ComputedSize;
                 dim.AnnotationOrigin = check_point1;
                 dim.IsOriginCentered = true;
-                y = y + 10;
             }
             #endregion
-            
+
             #region 对圆弧面进行标注
             foreach (Face mark_arc_face in arc_dimension_face)
             {
@@ -383,11 +553,16 @@ namespace NXFunctions
                 DatumPlane mark_plane;
                 IntersectionCurve mark_curve;
                 createdatadum(mark_arc_face, out mark_plane);
-                createlinkcurve(mark_plane,mark_arc_face,out mark_curve);
-                createArcDimension(mark_curve);
+                createlinkcurve(mark_plane, mark_arc_face, out mark_curve);
+                Dimension arcdimension = null;
+                createArcDimension(mark_curve, out arcdimension);
+                Point3d helpoint = arcdimension.AnnotationOrigin;
+                helpoint.Y = arcdimension.ComputedSize;
+                helpoint.Z = arcdimension.ComputedSize;
+                arcdimension.AnnotationOrigin = helpoint;
             }
-            #endregion 
-            
+            #endregion
+
             #region 删除加进来的制造体
             deleteBody.Add(manuBody);
             NXObject[] deleteObject = deleteBody.ToArray();
@@ -395,15 +570,15 @@ namespace NXFunctions
             #endregion
 
             //完成后，对视图的标注改成后视图，为轴向标注做准备
-            SetDisPlay(workPart,"BACK");
+            SetDisPlay(workPart, "BACK");
         }
-        #endregion 
+        #endregion
 
         #region 输入待检测的平面，将其按照X轴正方向从大到小输出,用于粗加工，内含对退刀槽的检测
-        public void GetFaceWithPoint_Rough(Face[] checkface,out List<Face> CompareFace, out List<double>ComparePoint)
+        public void GetFaceWithPoint_Rough(Face[] checkface, out List<Face> CompareFace, out List<double> ComparePoint)
         {
             List<Face> CompareFace1 = new List<Face>();
-            List<double> ComparePoint1=new List<double>();
+            List<double> ComparePoint1 = new List<double>();
             double temp = 0;//用来处理第一次
             foreach (Face check_face1 in checkface)
             {
@@ -432,7 +607,7 @@ namespace NXFunctions
                         {
                             #region 尝试对退刀槽进行检查，如果失败，想要回滚，直接删掉if部分，然后把else去掉就好
                             //这里要加入退刀槽的检测，到时用一个else把下头的代码包括进去
-                            double check_num=0;
+                            double check_num = 0;
                             check_num = Math.Abs(check_point - point[0]);
                             if (check_num <= 4)//检测为疑似退刀槽对象
                             {
@@ -469,7 +644,7 @@ namespace NXFunctions
                                     break;
                                 }
                             }
-                            #endregion 
+                            #endregion
                         }
                     }
                 }
@@ -478,146 +653,146 @@ namespace NXFunctions
             ComparePoint = ComparePoint1;
         }
         #endregion
-        
+
         #region 输入待检测的平面，将其按照X轴正方向从大到小输出,用于精加工对退刀槽并不检测
         public void GetFaceWithPoint_Finish(Face[] checkface, out List<Face> CompareFace, out List<double> ComparePoint)
+        {
+            List<Face> CompareFace1 = new List<Face>();
+            List<double> ComparePoint1 = new List<double>();
+            double temp = 0;//用来处理第一次
+            foreach (Face check_face1 in checkface)
+            {
+                double[] point_num_get = ComparePoint1.ToArray();
+                int num = point_num_get.Length;//得到点的个数，从而应对如果现在判断的点是最小的
+                int type;
+                double[] point = new double[6];
+                double[] dir = new double[5];
+                double[] box = new double[6];
+                double radius;
+                double rad_data;
+                int norm_dir;
+                theUFSession.Modl.AskFaceData(check_face1.Tag, out type, point, dir, box, out radius, out rad_data, out norm_dir);
+                if (type == 22)
                 {
-                    List<Face> CompareFace1 = new List<Face>();
-                    List<double> ComparePoint1 = new List<double>();
-                    double temp = 0;//用来处理第一次
-                    foreach (Face check_face1 in checkface)
+                    if (temp == 0)//最开始
                     {
-                        double[] point_num_get = ComparePoint1.ToArray();
-                        int num = point_num_get.Length;//得到点的个数，从而应对如果现在判断的点是最小的
-                        int type;
-                        double[] point = new double[6];
-                        double[] dir = new double[5];
-                        double[] box = new double[6];
-                        double radius;
-                        double rad_data;
-                        int norm_dir;
-                        theUFSession.Modl.AskFaceData(check_face1.Tag, out type, point, dir, box, out radius, out rad_data, out norm_dir);
-                        if (type == 22)
+                        CompareFace1.Add(check_face1);
+                        temp = temp + 1;
+                        ComparePoint1.Add(point[0]);
+                    }
+                    else
+                    {//对面在轴上的位置进行判断，按照从大到小的顺序,利用点的集合
+                        int index = 0;
+                        foreach (double check_point in ComparePoint1)
                         {
-                            if (temp == 0)//最开始
+                            if (check_point < point[0])
                             {
-                                CompareFace1.Add(check_face1);
-                                temp = temp + 1;
+                                ComparePoint1.Insert(index, point[0]);
+                                CompareFace1.Insert(index, check_face1);
+                                break;
+                            }
+                            index = index + 1;
+                            if (index == num)
+                            {
                                 ComparePoint1.Add(point[0]);
-                            }
-                            else
-                            {//对面在轴上的位置进行判断，按照从大到小的顺序,利用点的集合
-                                int index = 0;
-                                foreach (double check_point in ComparePoint1)
-                                {
-                                        if (check_point < point[0])
-                                        {
-                                            ComparePoint1.Insert(index, point[0]);
-                                            CompareFace1.Insert(index, check_face1);
-                                            break;
-                                        }
-                                        index = index + 1;
-                                        if (index == num)
-                                        {
-                                            ComparePoint1.Add(point[0]);
-                                            CompareFace1.Add(check_face1);
-                                            break;
-                                        }
-                                }
-                            }
-                        }
-                    }
-                    CompareFace = CompareFace1;
-                    ComparePoint = ComparePoint1;
-                }
-        #endregion
-
-        #region 检测退刀槽端面
-        public void CheckRectorFace(Face formFace, Face compareFace,out int choose)
-                {
-                    choose = 0;
-                    Edge[] edge1 = formFace.GetEdges();
-                    Edge[] edge2 = compareFace.GetEdges();
-                    List<Face> Compare1 = new List<Face>();//已经在列表里的
-                    List<Face> Compare2 = new List<Face>();
-                    #region 得到两个端面的圆柱面集合
-                    foreach (Edge check_edge1 in edge1)
-                    {//对每个边拥有的面进行检查
-                        foreach (Face check_face1 in check_edge1.GetFaces())
-                        {
-                            if (check_face1.SolidFaceType.ToString() == "Cylindrical")
-                            {//为圆柱面（我们要用来检测
-                                Compare1.Add(check_face1);
-                            }
-                        }
-                    }
-                    foreach (Edge check_edge2 in edge2)
-                    {
-                        foreach (Face check_face2 in check_edge2.GetFaces())
-                        {
-                            if (check_face2.SolidFaceType.ToString() == "Cylindrical")
-                            {
-                                Compare2.Add(check_face2);
-                            }
-                        }
-                    }
-                    #endregion
-                    #region 得到三个比较的圆柱面
-                    Face CenterFace=null;
-                    int temp = 0;
-                    //根据实验，必须要加一个跳转指示
-                    foreach (Face check_face1 in Compare1)
-                    {
-                        foreach(Face check_face2 in Compare2)
-                        {
-                            if (check_face1 == check_face2)//找到了那个公共面
-                            {
-                                CenterFace = check_face1;
-                                Compare1.Remove(check_face1);
-                                Compare2.Remove(check_face2);
-                                temp = 1;
+                                CompareFace1.Add(check_face1);
                                 break;
                             }
                         }
-                        if (temp == 1)
-                        {
-                            break;
-                        }
                     }
-                    //此时Compare1,Compare2,CenterFace分别对应三个圆柱面，进行检查
-                    #endregion 
-                    #region 利用圆柱面的尺寸进行比较
-                    Face Compareface1 = Compare1[0];
-                    Face Compareface2 = Compare2[0];
-                    Dimension dim1;
-                    Dimension dim2;
-                    Dimension centerdim;
-                    Point3d helppoint = new Point3d(0, 0, 0);
-                    Cylindricaldimension(Compareface1,helppoint,out dim1);
-                    Cylindricaldimension(Compareface2,helppoint, out dim2);
-                    Cylindricaldimension(CenterFace, helppoint, out centerdim);
-                    NXObject[] deletedimension = new NXObject[3];
-                    deletedimension[0] = dim1;
-                    deletedimension[1] = dim2;
-                    deletedimension[2] = centerdim;
-                    if((centerdim.ComputedSize<dim1.ComputedSize)&(centerdim.ComputedSize<dim2.ComputedSize))
-                    {
-                        if (dim1.ComputedSize > dim2.ComputedSize)
-                        {//保留原来就存在里头的
-                            choose = 2;
-                            DeleteObject(deletedimension);
-                            return;
-                        }
-                        if (dim1.ComputedSize < dim2.ComputedSize)
-                        {//需要替换
-                            choose = 1;
-                            DeleteObject(deletedimension);
-                            return;
-                        }
-                    }
-                    #endregion
                 }
-        #endregion 
+            }
+            CompareFace = CompareFace1;
+            ComparePoint = ComparePoint1;
+        }
+        #endregion
+
+        #region 检测退刀槽端面
+        public void CheckRectorFace(Face formFace, Face compareFace, out int choose)
+        {
+            choose = 0;
+            Edge[] edge1 = formFace.GetEdges();
+            Edge[] edge2 = compareFace.GetEdges();
+            List<Face> Compare1 = new List<Face>();//已经在列表里的
+            List<Face> Compare2 = new List<Face>();
+            #region 得到两个端面的圆柱面集合
+            foreach (Edge check_edge1 in edge1)
+            {//对每个边拥有的面进行检查
+                foreach (Face check_face1 in check_edge1.GetFaces())
+                {
+                    if (check_face1.SolidFaceType.ToString() == "Cylindrical")
+                    {//为圆柱面（我们要用来检测
+                        Compare1.Add(check_face1);
+                    }
+                }
+            }
+            foreach (Edge check_edge2 in edge2)
+            {
+                foreach (Face check_face2 in check_edge2.GetFaces())
+                {
+                    if (check_face2.SolidFaceType.ToString() == "Cylindrical")
+                    {
+                        Compare2.Add(check_face2);
+                    }
+                }
+            }
+            #endregion
+            #region 得到三个比较的圆柱面
+            Face CenterFace = null;
+            int temp = 0;
+            //根据实验，必须要加一个跳转指示
+            foreach (Face check_face1 in Compare1)
+            {
+                foreach (Face check_face2 in Compare2)
+                {
+                    if (check_face1 == check_face2)//找到了那个公共面
+                    {
+                        CenterFace = check_face1;
+                        Compare1.Remove(check_face1);
+                        Compare2.Remove(check_face2);
+                        temp = 1;
+                        break;
+                    }
+                }
+                if (temp == 1)
+                {
+                    break;
+                }
+            }
+            //此时Compare1,Compare2,CenterFace分别对应三个圆柱面，进行检查
+            #endregion
+            #region 利用圆柱面的尺寸进行比较
+            Face Compareface1 = Compare1[0];
+            Face Compareface2 = Compare2[0];
+            Dimension dim1;
+            Dimension dim2;
+            Dimension centerdim;
+            Point3d helppoint = new Point3d(0, 0, 0);
+            Cylindricaldimension(Compareface1, helppoint, out dim1);
+            Cylindricaldimension(Compareface2, helppoint, out dim2);
+            Cylindricaldimension(CenterFace, helppoint, out centerdim);
+            NXObject[] deletedimension = new NXObject[3];
+            deletedimension[0] = dim1;
+            deletedimension[1] = dim2;
+            deletedimension[2] = centerdim;
+            if ((centerdim.ComputedSize < dim1.ComputedSize) & (centerdim.ComputedSize < dim2.ComputedSize))
+            {
+                if (dim1.ComputedSize > dim2.ComputedSize)
+                {//保留原来就存在里头的
+                    choose = 2;
+                    DeleteObject(deletedimension);
+                    return;
+                }
+                if (dim1.ComputedSize < dim2.ComputedSize)
+                {//需要替换
+                    choose = 1;
+                    DeleteObject(deletedimension);
+                    return;
+                }
+            }
+            #endregion
+        }
+        #endregion
         /*对当前两个平面进行检测（未试验，准备用于退刀槽
         formFace为listpoint[index]处的面，而compareFaces是当前要检测的面
         /*formface对应的是CompareFace(index),compareFace对应的是check_face
@@ -631,7 +806,7 @@ namespace NXFunctions
         /// </summary>
         /// <param name="position">放置位置</param>
         /// <param name="mark_datumplane">基准平面</param>
-        public void createDatumPlane(Point3d position,out DatumPlane mark_datumplane)
+        public void createDatumPlane(Point3d position, out DatumPlane mark_datumplane)
         {
             Session theSession = Session.GetSession();
             Part workPart = theSession.Parts.Work;
@@ -672,7 +847,7 @@ namespace NXFunctions
             mark_datumplane = datumPlane1;
             datumPlaneBuilder1.Destroy();
         }
-        #endregion 
+        #endregion
 
         #region 轴向尺寸标注
         public void createaxisdimension(Edge helpedge1, Edge helpedge2, out Dimension markdim)
@@ -696,7 +871,7 @@ namespace NXFunctions
             Point3d secondDefinitionPoint1 = new Point3d(0.0, 0.0, 0.0);
             associativity1.SecondDefinitionPoint = secondDefinitionPoint1;
             associativity1.Angle = 0.0;
-            Point3d pickPoint1 = new Point3d(0,0,0);
+            Point3d pickPoint1 = new Point3d(0, 0, 0);
             associativity1.PickPoint = pickPoint1;
             NXOpen.Annotations.Associativity[] associativity2 = new NXOpen.Annotations.Associativity[1];
             associativity2[0] = associativity1;
@@ -715,7 +890,7 @@ namespace NXFunctions
             Point3d secondDefinitionPoint2 = new Point3d(0.0, 0.0, 0.0);
             associativity3.SecondDefinitionPoint = secondDefinitionPoint2;
             associativity3.Angle = 0.0;
-            Point3d pickPoint2 = new Point3d(0,0,0);
+            Point3d pickPoint2 = new Point3d(0, 0, 0);
             associativity3.PickPoint = pickPoint2;
             NXOpen.Annotations.Associativity[] associativity4 = new NXOpen.Annotations.Associativity[1];
             associativity4[0] = associativity3;
@@ -800,7 +975,7 @@ namespace NXFunctions
             pmiData1.Dispose();
         }
         #endregion
-        
+
         #region 径向标注（全部换为圆柱标注
         public void Cylindricaldimension(Face markFace, Point3d helppoint, out Dimension markDim)
         {
@@ -1016,7 +1191,7 @@ namespace NXFunctions
             mark_plane = datumPlane1;//输出一个基准平面
             datumPlaneBuilder1.Destroy();
         }
-        #endregion 
+        #endregion
 
         #region 针对圆弧面的标注，建立交线，需要获取工作部件
         public void createlinkcurve(DatumPlane datumplane, Face datumface, out IntersectionCurve mark_curve)//输出为交线
@@ -1036,7 +1211,7 @@ namespace NXFunctions
             rules1[0] = faceDumbRule1;
             intersectionCurveBuilder1.FirstFace.ReplaceRules(rules1, false);
             TaggedObject[] objects1 = new TaggedObject[1];
-            objects1[0] =datumplane;
+            objects1[0] = datumplane;
             bool added1;
             added1 = intersectionCurveBuilder1.FirstSet.Add(objects1);
             //得到平面
@@ -1060,7 +1235,7 @@ namespace NXFunctions
         #endregion
 
         #region 标注圆弧面的半径，需要获取工作部件
-        public void createArcDimension(IntersectionCurve mark_curve)
+        public void createArcDimension(IntersectionCurve mark_curve,out Dimension arcdimension)
         {
             //到时还是要改成装配
             Part workPart = theSession.Parts.Work;
@@ -1099,6 +1274,7 @@ namespace NXFunctions
             narrowDimensionPreferences1 = dimensionPreferences1.GetNarrowDimensionPreferences();
             narrowDimensionPreferences1.DimensionDisplayOption = NXOpen.Annotations.NarrowDisplayOption.None;
             dimensionPreferences1.SetNarrowDimensionPreferences(narrowDimensionPreferences1);
+            dimensionPreferences1.TextOrientation = NXOpen.Annotations.TextOrientation.Horizontal;//水平
             narrowDimensionPreferences1.Dispose();
             NXOpen.Annotations.UnitsFormatPreferences unitsFormatPreferences1;
             unitsFormatPreferences1 = dimensionPreferences1.GetUnitsFormatPreferences();
@@ -1160,26 +1336,35 @@ namespace NXFunctions
             Point3d origin1 = new Point3d(0.0, 0.0, 0.0);
             NXOpen.Annotations.PmiRadiusDimension pmiRadiusDimension1;
             pmiRadiusDimension1 = workPart.Dimensions.CreatePmiRadiusDimension(dimensionData1, NXOpen.Annotations.RadiusDimensionType.NotToCenter, pmiData1, xform1, origin1);
+            pmiRadiusDimension1.IsOriginCentered = true;
+            arcdimension = pmiRadiusDimension1;
             dimensionData1.Dispose();
             pmiData1.Dispose();
-            pmiRadiusDimension1.IsOriginCentered = true;
+            
         }
-        #endregion 
-        #endregion 
+        #endregion
+        #endregion
 
         #region 冗余的检查
-        public void CheckOverDimension(Face checkface1,Face checkface2,List<Face>Checkface,out bool check)
+        public void CheckOverDimension(Face checkface1, Face checkface2, List<Face> Checkface, out bool check)
         {
+            Part workpart = theSession.Parts.Work;
+            Dimension[] all_dimension = workpart.Dimensions.ToArray();
             check = false;
+            int n=all_dimension.Length;
+            int m=Checkface.ToArray().Length;
             if ((Checkface.Contains(checkface1) == true) & (Checkface.Contains(checkface2) == true))
             {
-                check = true;
+                if (m == n + 1)
+                {//避免出现类似于四面但只有两个尺寸的情况
+                    check = true;
+                }
             }
         }
-        #endregion 
+        #endregion
 
         #region 将属性邻接图存储到XML中
-        public void InputXml(string name, List<int[]> neigh_Face,XmlDocument all)
+        public void InputXml(string name, List<int[]> neigh_Face, XmlDocument all)
         {
             XmlDocument xml = all;
             XmlNode root = xml.SelectSingleNode("零件名及其零件属性图");
@@ -1188,10 +1373,10 @@ namespace NXFunctions
             foreach (int[] num in neigh_Face)
             {
                 XmlElement childEle = xml.CreateElement("属性邻接图");
-                string content="[";
+                string content = "[";
                 for (int i = 0; i < num.Length; i++)
                 {
-                    content = content + num[i].ToString()+" ";
+                    content = content + num[i].ToString() + " ";
                 }
                 content = content + "]";
                 childEle.InnerText = content;
@@ -1199,7 +1384,7 @@ namespace NXFunctions
             }
             xml.Save("d://属性邻接图.xml");
         }
-        #endregion 
+        #endregion
 
         //public void Cylindricaldimension(Face face1, out Dimension dim)
         //{
@@ -1579,6 +1764,6 @@ namespace NXFunctions
         //    }
         //    #endregion
         //}
-        #endregion 
+        #endregion
     }
 }
